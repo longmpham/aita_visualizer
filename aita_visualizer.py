@@ -158,6 +158,8 @@ def text_to_speech(post):
     return output_file
 
 def createClip(screenshotFile, mp3file):
+    # todo: create a text overlay on the screenshot 
+    # for subtitleson the screen
     mp4file = "post.mp4"
     audio = AudioFileClip(mp3file)
     video = ImageSequenceClip(screenshotFile, fps=5).set_duration(audio.duration)
