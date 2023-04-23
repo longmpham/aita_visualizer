@@ -6,6 +6,7 @@ import pyttsx3
 import re
 from datetime import datetime, timedelta
 from moviepy.editor import *
+from gtts import gTTS
 
 
 def utc_to_relative_time(utc_timestamp):
@@ -95,23 +96,14 @@ def get_posts(url):
             "url": url,
             "date_time": utc_time,
         })
-
-        # test printing
-        # print(f'
-        #   Title: {title}\n
-        #   Selftext: {selftext}\n
-        #   Ups: {ups}\n
-        #   UTC time: {utc_time} UTC\n
-        #   Relative time: {relative_time} ago\n
-        #   URL: {url}\n'
-        # )
+    print(f"finished getting posts from {url}")
     return posts
 
 
 def get_specific_post(posts, index):
     post = posts[index]
+    print_post(posts, index)
     return post
-
 
 def print_post(posts, index=0):
     post = posts[index]
@@ -160,7 +152,7 @@ def print_json(json_object):
     print(json.dumps(json_object, indent=2))
 
 
-def text_to_speech(post):
+def text_to_speech_pyttsx3(post):
     text = post["selftext"]
     output_file = "post-text.mp3"
     engine = pyttsx3.init()
@@ -171,51 +163,96 @@ def text_to_speech(post):
     engine.runAndWait()
     return output_file
 
-def format_text_to_fit_window(words):
-    words = words.split()
-    for i in range(7, len(words), 8):
-        words[i] += '\n'
-    return ' '.join(words)
+def text_to_speech_gtts(post):
+    text = post["selftext"]
+    output_file = "post-text.mp3"
+
+    tts = gTTS(text, lang='en')
+    tts.save(output_file)
+    return output_file
+
+def format_text(text):
+    # Explanation:
+    # 
+    # 1. Match a single character present in the list below [a-z]{2}. {2} Quantifier — Matches exactly 2 times.
+    # 2. \n matches a line-feed (newline) character (ASCII 10)
+    # 3. Negative Lookahead (?!\n). Assert that the Regex below does not match.
+    # https://stackoverflow.com/questions/61150145/remove-line-breaks-but-not-double-line-breaks-python
+    formatted_text = text.replace("*", "")
+    formatted_text = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_text)
+    return formatted_text
 
 def createClip(mp3file, post):
-    screenshot_file = ["screenshot.jpg"]
-    mp4_file = "post.mp4"
+    screenshot_file = ["screenshot.jpg"] # in a list since we're just using still images.
+    mp4_file = "Top AITA of the Day.mp4"
     post_body = post["selftext"]
-    video_size = (1280, 720)
-    # w = 720
-    # h = w*9/16 # 16/9 screen
-    # video_size = w,h
+    width = 720
+    height = width*9/16 # 16/9 screen
+    video_size = width,height
+    font='Arial'
+    fontsize=18
+    color='white'
+    bg_color='black'
 
-    # post_body = format_text_to_fit_window(post_body)
-    # print(post_body)
-    post_title = post["title"]
-    post_body = post_title + "\n\n" + post_body
-    post_body = post_body + "\n\n" +  "Comment what you think!" + "\n" + \
-        "YTA = You're the Asshole" + " | " + \
-        "YWBTA = You Would Be the Asshole" + " | " + \
-        "NTA = Not the Asshole" + \
-        "YWNBTA = You Would Not be the Asshole" + " | " + \
-        "ESH = Everyone Sucks Here" + " | " + \
-        "NAH = No Assholes Here" + " | " + \
-        "INFO = Not Enough Info"
+    def create_post_text_for_video(post):
+        post_title = post["title"]
+        post_body = post["selftext"]
+        post_body = post_title + "\n\n" + post_body
+        return post_body
+
+    post_body = create_post_text_for_video(post)
+    post_body = format_text(post_body)
+
+    def create_comments_text_for_video(post):
+        # comments = post["comments"]
+        # formatted_comments = '\n'.join([comment['comment'] for comment in comments])
+        # # print(formatted_comments)
+        # return formatted_comments
     
-    comments = post["comments"]
+        comments = post["comments"]
+        formatted_comments = ""
+        for comment in comments:
+            formatted_comments += f"{comment['author']}:\n{comment['comment']}\n\n"
+        
+        formatted_comments = formatted_comments + "\n\n" +  "Comment what you think!" + "\n" + \
+            "YTA = You're the Asshole" + " | " + \
+            "YWBTA = You Would Be the Asshole" + " | " + \
+            "NTA = Not the Asshole" + " | " + \
+            "YWNBTA = You Would Not be the Asshole" + " | " + \
+            "ESH = Everyone Sucks Here" + " | " + \
+            "NAH = No Assholes Here" + " | " + \
+            "INFO = Not Enough Info"
+        return formatted_comments
 
     audio = AudioFileClip(mp3file)
     video = ImageSequenceClip(screenshot_file, fps=5)
     video.set_duration(audio.duration)
     
     # Create a TextClip with the selftext
-    post_body_text_clip = TextClip(post_body, font='Arial', fontsize=18, color='white', bg_color='black', align="West", method='caption', size=video_size)
-    post_body_text_clip.set_duration(audio.duration + 5) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
+    post_body_text_clip = TextClip(post_body, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align="West", method='caption', size=video_size)
+    post_body_text_clip.set_duration(audio.duration) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
     post_body_text_clip.resize(video_size)
 
-    # Put everything together
+    # Add the audio to the video
     background_clip = video.set_audio(audio)
-    final_clip = CompositeVideoClip([background_clip, post_body_text_clip], size=video_size).set_duration(audio.duration).resize(video_size)
+    intermediate_clip = CompositeVideoClip([background_clip, post_body_text_clip], size=video_size)
+    intermediate_clip.set_duration(audio.duration + 5)
+    intermediate_clip.resize(video_size)
+
+    # Add the comments section at the end of the video
+    comments = create_comments_text_for_video(post)
+    comments = format_text(comments)
+    comments_clip = TextClip(comments, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=video_size)
+    comments_clip = comments_clip.set_position("center", "center")
+    comments_clip = comments_clip.set_start(audio.duration)
+    comments_clip = comments_clip.set_end(audio.duration + 20)
+
+    # final_clip = CompositeVideoClip([intermediate_clip, comments_clip])
+    # print(intermediate_clip.duration)
+    # final_duration = (int(comments_clip.duration) + int(intermediate_clip.duration))
+    final_clip = CompositeVideoClip([intermediate_clip, comments_clip]).set_duration(audio.duration + 20) # play comments for 20s
 
     final_clip.write_videofile(mp4_file)
-    # background_clip.write_videofile(mp4_file)
     return mp4_file
 
 def main():
@@ -239,15 +276,14 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    mp3file = text_to_speech(combined_post)
+    mp3file = text_to_speech_pyttsx3(combined_post)
+    # mp3file = text_to_speech_gtts(combined_post) # I find this too slow...
     mp4file = createClip(mp3file, combined_post)
 
     # Anything extra... 
     # print_post(reddit_posts, post_num)
     # print_comments(comments)
     # print_json(combined_post)
-
-
 
 if __name__ == "__main__":
     main()
