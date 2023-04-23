@@ -25,7 +25,6 @@ def utc_to_relative_time(utc_timestamp):
         days = time_diff.days
         return f'{days} days ago'
 
-
 def get_comments(url, max_num_of_comments=3):
     # print(url)
     url = url + ".json"
@@ -55,7 +54,6 @@ def get_comments(url, max_num_of_comments=3):
     # comments = [comment['data']['body'] for comment in comments_data]
     # return comments
 
-
 def print_comments(comments):
     for index, comment in enumerate(comments):
         print(
@@ -68,7 +66,6 @@ def print_comments(comments):
             sep='\n',
         )
         # print("Comment #" + str(index+1) + ": " + comment)
-
 
 def get_posts(url):
 
@@ -99,10 +96,9 @@ def get_posts(url):
     print(f"finished getting posts from {url}")
     return posts
 
-
 def get_specific_post(posts, index):
     post = posts[index]
-    print_post(posts, index)
+    # print_post(posts, index)
     return post
 
 def print_post(posts, index=0):
@@ -118,7 +114,6 @@ def print_post(posts, index=0):
         sep='\n',
     )
 
-
 def print_all_posts(posts):
     for post in posts[0]:
         print(
@@ -132,11 +127,9 @@ def print_all_posts(posts):
             sep='\n',
         )
 
-
 def get_num_of_posts(posts):
     print(len(posts))
     return len(posts)
-
 
 def combine_post_comments(post, comments):
     # what is the type of post and comments?
@@ -147,13 +140,11 @@ def combine_post_comments(post, comments):
     merged_post["comments"] = comments
     return merged_post
 
-
 def print_json(json_object):
     print(json.dumps(json_object, indent=2))
 
-
 def text_to_speech_pyttsx3(post):
-    text = post["selftext"]
+    text = post["title"] + post["selftext"]
     output_file = "post-text.mp3"
     engine = pyttsx3.init()
     engine.setProperty('rate', 200)
@@ -171,37 +162,76 @@ def text_to_speech_gtts(post):
     tts.save(output_file)
     return output_file
 
-def format_text(text):
+def format_text(post):
     # Explanation:
     # 
     # 1. Match a single character present in the list below [a-z]{2}. {2} Quantifier — Matches exactly 2 times.
     # 2. \n matches a line-feed (newline) character (ASCII 10)
     # 3. Negative Lookahead (?!\n). Assert that the Regex below does not match.
     # https://stackoverflow.com/questions/61150145/remove-line-breaks-but-not-double-line-breaks-python
-    formatted_text = text.replace("*", "")
-    formatted_text = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_text)
-    return formatted_text
+    # formatted_text = text.replace("*", "")
+    # formatted_text = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_text)
+    # return formatted_text
+
+    formatted_post = {}
+    for key, val in post.items():
+        if key == 'comments':
+            formatted_comments = []
+            for comment in val:
+                formatted_comment = {}
+                for comment_key, comment_val in comment.items():
+                    if comment_key == 'comment':
+                        formatted_comment_val = comment_val.replace("*", "")
+                        formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_comment_val)
+                        formatted_comment[comment_key] = formatted_comment_val
+                    elif comment_key == 'author':
+                        formatted_comment[comment_key] = comment_val
+                formatted_comments.append(formatted_comment)
+            formatted_post[key] = formatted_comments
+        elif key in ['title', 'selftext']:
+            formatted_val = val.replace("*", "")
+            formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_val)
+            formatted_post[key] = formatted_val
+        else:
+            formatted_post[key] = val
+    return formatted_post
 
 def createClip(mp3file, post):
     screenshot_file = ["screenshot.jpg"] # in a list since we're just using still images.
     mp4_file = "Top AITA of the Day.mp4"
-    post_body = post["selftext"]
+    post = post
     width = 720
-    height = width*9/16 # 16/9 screen
+    height = int(width*9/16) # 16/9 screen
     video_size = width,height
+    text_size = (int(video_size[0]*0.75), int(video_size[1]*0.75))
     font='Arial'
     fontsize=18
     color='white'
-    bg_color='black'
+    bg_color='transparent'
 
-    def create_post_text_for_video(post):
+    def create_post_text_for_video(post, total_tts_time):
         post_title = post["title"]
         post_body = post["selftext"]
         post_body = post_title + "\n\n" + post_body
-        return post_body
 
-    post_body = create_post_text_for_video(post)
-    post_body = format_text(post_body)
+        # Split the text into a list of paragraphs
+        paragraph_list = post_body.split("\n\n")
+        step = total_tts_time/len(paragraph_list) #each 15 sec: 0, 15, 30
+        duration = step
+        t = 0
+        text_clips = []
+        for text,i in zip(paragraph_list,range(0,len(paragraph_list))):
+            text_clip = TextClip(text,font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=text_size)
+            text_clip = text_clip.set_start(t)
+            text_clip = text_clip.set_pos('center').set_duration(3 if i==0 else duration)
+            text_clips.append(text_clip)  
+            t += 3 if i==0 else step
+            # print(text_clip)
+
+        return text_clips
+        # return post_body
+
+    # format string to take out any uncessary crap
 
     def create_comments_text_for_video(post):
         # comments = post["comments"]
@@ -223,25 +253,31 @@ def createClip(mp3file, post):
             "NAH = No Assholes Here" + " | " + \
             "INFO = Not Enough Info"
         return formatted_comments
+    
+    post = format_text(post)
 
     audio = AudioFileClip(mp3file)
     video = ImageSequenceClip(screenshot_file, fps=5)
     video.set_duration(audio.duration)
-    
+    audio_duration = int(audio.duration) + 5
+    text_clips = create_post_text_for_video(post, audio_duration)
     # Create a TextClip with the selftext
-    post_body_text_clip = TextClip(post_body, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align="West", method='caption', size=video_size)
-    post_body_text_clip.set_duration(audio.duration) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
-    post_body_text_clip.resize(video_size)
+    # post_body_text_clip = TextClip(post_body, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align="West", method='caption', size=video_size)
+    # post_body_text_clip.set_duration(audio.duration) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
+    # post_body_text_clip.resize(video_size)
+
+    # Create a composite video of text clips
+    
 
     # Add the audio to the video
     background_clip = video.set_audio(audio)
-    intermediate_clip = CompositeVideoClip([background_clip, post_body_text_clip], size=video_size)
-    intermediate_clip.set_duration(audio.duration + 5)
-    intermediate_clip.resize(video_size)
+    intermediate_clip = CompositeVideoClip([background_clip, *text_clips], size=video_size)
+    # intermediate_clip.set_duration(audio_duration)
+    # intermediate_clip.resize(video_size)
 
     # Add the comments section at the end of the video
     comments = create_comments_text_for_video(post)
-    comments = format_text(comments)
+    # comments = format_text(comments)
     comments_clip = TextClip(comments, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=video_size)
     comments_clip = comments_clip.set_position("center", "center")
     comments_clip = comments_clip.set_start(audio.duration)
