@@ -1,9 +1,12 @@
+import numpy as np
 import requests
 import time
 import json
 import pyttsx3
+import re
 from datetime import datetime, timedelta
 from moviepy.editor import *
+
 
 def utc_to_relative_time(utc_timestamp):
     now = datetime.utcnow()
@@ -21,7 +24,8 @@ def utc_to_relative_time(utc_timestamp):
         days = time_diff.days
         return f'{days} days ago'
 
-def get_comments(url,max_num_of_comments=3):
+
+def get_comments(url, max_num_of_comments=3):
     # print(url)
     url = url + ".json"
     max_num_of_comments = max_num_of_comments
@@ -50,6 +54,7 @@ def get_comments(url,max_num_of_comments=3):
     # comments = [comment['data']['body'] for comment in comments_data]
     # return comments
 
+
 def print_comments(comments):
     for index, comment in enumerate(comments):
         print(
@@ -60,11 +65,12 @@ def print_comments(comments):
             "Ups: " + str(comment["ups"]),
             "Relative-Time: " + str(comment["relative_time"]),
             sep='\n',
-        )    
+        )
         # print("Comment #" + str(index+1) + ": " + comment)
 
+
 def get_posts(url):
-    
+
     # get all posts from the url given
     url = url
     response = requests.get(url, headers={"User-agent": "Mozilla/5.0"})
@@ -78,7 +84,8 @@ def get_posts(url):
         ups = post["data"]["ups"]
         utc_timestamp = post["data"]["created_utc"]
         url = post["data"]['url']
-        utc_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(utc_timestamp))
+        utc_time = time.strftime(
+            "%Y-%m-%d %H:%M:%S", time.localtime(utc_timestamp))
         posts.append({
             "title": title,
             "selftext": selftext,
@@ -89,7 +96,7 @@ def get_posts(url):
             "date_time": utc_time,
         })
 
-        # test printing 
+        # test printing
         # print(f'
         #   Title: {title}\n
         #   Selftext: {selftext}\n
@@ -100,9 +107,11 @@ def get_posts(url):
         # )
     return posts
 
+
 def get_specific_post(posts, index):
     post = posts[index]
     return post
+
 
 def print_post(posts, index=0):
     post = posts[index]
@@ -117,6 +126,7 @@ def print_post(posts, index=0):
         sep='\n',
     )
 
+
 def print_all_posts(posts):
     for post in posts[0]:
         print(
@@ -130,11 +140,13 @@ def print_all_posts(posts):
             sep='\n',
         )
 
+
 def get_num_of_posts(posts):
     print(len(posts))
     return len(posts)
 
-def combine_post_comments(post,comments):
+
+def combine_post_comments(post, comments):
     # what is the type of post and comments?
     # print(type(post)) # dict
     # print(type(comments)) # list of dict
@@ -143,8 +155,10 @@ def combine_post_comments(post,comments):
     merged_post["comments"] = comments
     return merged_post
 
+
 def print_json(json_object):
     print(json.dumps(json_object, indent=2))
+
 
 def text_to_speech(post):
     text = post["selftext"]
@@ -157,38 +171,83 @@ def text_to_speech(post):
     engine.runAndWait()
     return output_file
 
-def createClip(screenshotFile, mp3file):
-    # todo: create a text overlay on the screenshot 
-    # for subtitleson the screen
-    mp4file = "post.mp4"
+def format_text_to_fit_window(words):
+    words = words.split()
+    for i in range(7, len(words), 8):
+        words[i] += '\n'
+    return ' '.join(words)
+
+def createClip(mp3file, post):
+    screenshot_file = ["screenshot.jpg"]
+    mp4_file = "post.mp4"
+    post_body = post["selftext"]
+    video_size = (1280, 720)
+    # w = 720
+    # h = w*9/16 # 16/9 screen
+    # video_size = w,h
+
+    # post_body = format_text_to_fit_window(post_body)
+    # print(post_body)
+    post_title = post["title"]
+    post_body = post_title + "\n\n" + post_body
+    post_body = post_body + "\n\n" +  "Comment what you think!" + "\n" + \
+        "YTA = You're the Asshole" + " | " + \
+        "YWBTA = You Would Be the Asshole" + " | " + \
+        "NTA = Not the Asshole" + \
+        "YWNBTA = You Would Not be the Asshole" + " | " + \
+        "ESH = Everyone Sucks Here" + " | " + \
+        "NAH = No Assholes Here" + " | " + \
+        "INFO = Not Enough Info"
+    
+    comments = post["comments"]
+
     audio = AudioFileClip(mp3file)
-    video = ImageSequenceClip(screenshotFile, fps=5).set_duration(audio.duration)
-    # video = ColorClip((640, 480), color=(255, 255, 255))
-    final_clip = video.set_audio(audio)
-    final_clip.write_videofile(mp4file)
-    return mp4file
+    video = ImageSequenceClip(screenshot_file, fps=5)
+    video.set_duration(audio.duration)
+    
+    # Create a TextClip with the selftext
+    post_body_text_clip = TextClip(post_body, font='Arial', fontsize=18, color='white', bg_color='black', align="West", method='caption', size=video_size)
+    post_body_text_clip.set_duration(audio.duration + 5) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
+    post_body_text_clip.resize(video_size)
+
+    # Put everything together
+    background_clip = video.set_audio(audio)
+    final_clip = CompositeVideoClip([background_clip, post_body_text_clip], size=video_size).set_duration(audio.duration).resize(video_size)
+
+    final_clip.write_videofile(mp4_file)
+    # background_clip.write_videofile(mp4_file)
+    return mp4_file
 
 def main():
-    # 1.  Get all top posts from a subreddit
-    # 2.  Get the comments from the top post
-    # 3.  Combine the top post and the comments
-    # 4.  Print the combined post
-    # 5.  Convert the combined post to an mp3 file
-    # 6.  Play the mp3 file
+    # 1. Get all top posts from a subreddit
+    # 2. Get the comments from the top post
+    # 3. Combine the top post and the comments
+    # 4. Print the combined post
+    # 5. Convert the combined post to an mp3 file
+    # 6. Convert the mp3 file to an mp4 file
+    # 7. Add the post as a text overlay on top of the video
+    # 8. When the video ends, add the comments
+    # todo: 9. Autologin to YT, post the video
 
+    # Variables to choose from...
     url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
-    reddit_posts = get_posts(url)
-    post_num = 0 # first (top most post)
-    reddit_post = get_specific_post(reddit_posts, post_num)
-    # print_post(reddit_posts, post_num)
+    post_num = 0  # first (top most post) (usually <25 posts)
     num_of_comments = 3
-    comments = get_comments(reddit_post['url'], num_of_comments)
-    # print_comments(comments)
-    combined_post = combine_post_comments(reddit_post, comments)
-    print_json(combined_post)
-    screenshotFile = ["screenshot.jpg"]    
-    mp3file = text_to_speech(combined_post)
-    mp4file = createClip(screenshotFile, mp3file)
 
-if __name__=="__main__":
+    # The logic...
+    reddit_posts = get_posts(url)
+    reddit_post = get_specific_post(reddit_posts, post_num)
+    comments = get_comments(reddit_post['url'], num_of_comments)
+    combined_post = combine_post_comments(reddit_post, comments)
+    mp3file = text_to_speech(combined_post)
+    mp4file = createClip(mp3file, combined_post)
+
+    # Anything extra... 
+    # print_post(reddit_posts, post_num)
+    # print_comments(comments)
+    # print_json(combined_post)
+
+
+
+if __name__ == "__main__":
     main()
