@@ -413,7 +413,7 @@ def createClip(mp3file, post):
     # Add the audio to the video
     background_clip = video.set_audio(audio)
     intermediate_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
+    ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
     final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
     # Add the comments section at the end of the video
