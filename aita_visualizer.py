@@ -106,7 +106,7 @@ def get_posts(url):
 
 def get_specific_post(posts, index):
     post = posts[index]
-    # print_post(posts, index)
+    print_post(posts, index)
     return post
 
 def print_post(posts, index=0):
@@ -213,6 +213,8 @@ def format_text2(post):
                 formatted_comment = {}
                 for comment_key, comment_val in comment.items():
                     if comment_key == 'comment':
+                        # Remove links from comment text
+                        comment_val = re.sub(r'http\S+', '', comment_val)
                         formatted_comment_val = comment_val.replace("*", "")
                         formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_comment_val)
                         formatted_comment[comment_key] = formatted_comment_val
@@ -230,6 +232,8 @@ def format_text2(post):
                 else:
                     acronyms_dict[acronym_upper] = acronym
                 val = val.replace(acronym, acronym_upper)
+            # Remove links from selftext
+            val = re.sub(r'http\S+', '', val)
             formatted_val = val.replace("*", "")
             formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_val)
             formatted_post[key] = formatted_val
@@ -238,17 +242,30 @@ def format_text2(post):
     return formatted_post
 
 def createClip(mp3file, post):
-    screenshot_file = ["screenshot.jpg"] # in a list since we're just using still images.
+    screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
     mp4_file = "Top AITA of the Day.mp4"
     post = post
     width = 720
     height = int(width*9/16) # 16/9 screen
     video_size = width,height
-    text_size = (int(video_size[0]*0.75), int(video_size[1]*0.75))
+    mobile_video_size = height,width
+    text_size = (int(video_size[0]), int(video_size[1]*0.75)) # 16:9
+    mobile_text_size = (int(video_size[1]), int(video_size[0]*0.75)) # 9:16
     font='Arial'
     fontsize=18
     color='white'
-    bg_color='transparent'
+    bg_color='black'
+    opacity = 0.75
+
+    ending_comments =  \
+        "Comment what you think!" + "\n" + \
+        "YTA = You're the Asshole" + "\n" + \
+        "YWBTA = You Would Be the Asshole" + "\n" + \
+        "NTA = Not the Asshole" + "\n" + \
+        "YWNBTA = You Would Not be the Asshole" + "\n" + \
+        "ESH = Everyone Sucks Here" + "\n" + \
+        "NAH = No Assholes Here" + "\n" + \
+        "INFO = Not Enough Info"
 
     def create_post_text_for_video(post, total_tts_time):
         post_title = post["title"]
@@ -264,7 +281,7 @@ def createClip(mp3file, post):
         time = 0
         text_clips = []
         for text,i in zip(paragraph_list,range(0,len(paragraph_list))):
-            text_clip = TextClip(text,font=font, fontsize=fontsize, color=color, bg_color='transparent', align='West', method='caption', size=text_size)
+            text_clip = TextClip(text,font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=text_size)
             text_clip = text_clip.set_start(time)
             text_clip = text_clip.set_pos('center').set_duration(duration)
             # text_clip = text_clip.set_pos('center').set_duration(3 if i==0 else duration)
@@ -276,8 +293,8 @@ def createClip(mp3file, post):
         return text_clips
         # return post_body
 
-    def create_post_text_for_video2(post, total_tts_time):
-        wpm = 225
+    def create_post_text_for_video2(post):
+        wpm = 175 #225 seems like the sweet spot even though its set as 175...
         post_title = post["title"]
         post_body = post["selftext"]
         post_body = post_title + " " + post_body
@@ -290,15 +307,73 @@ def createClip(mp3file, post):
         for i, text in enumerate(paragraph_list):
             num_words = len(text.split())
             duration = (num_words / words_per_second)
-            # for acronym in acronyms_dict.keys():
-            #     if acronym in text:
-            #         print('check!')
-            #         duration -= 2
-            #         break
+            if(num_words > 100): 
+                duration = duration - 8 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 80): 
+                duration = duration - 6 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 60): 
+                duration = duration - 5 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 40): 
+                duration = duration - 3 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 20): 
+                duration = duration - 1 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            # duration = (duration - 3) if num_words > 40 else duration # kinda works kinda doesnt, better than nothing, needs to be reworked.
             print("Number of words: " + str(num_words))
             print(duration)
-            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color='transparent', align='West', method='caption', size=text_size)
+            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=text_size)
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration)
+            text_clips.append(text_clip)
+            time += duration
+
+        return text_clips
+
+    def create_post_text_for_video3(post):
+        wpm = 175 #225 seems like the sweet spot even though its set as 175...
+        post_title = post["title"]
+        post_body = post["selftext"]
+
+        print(post["comments"])
+
+        comments = post["comments"]
+        for comment in comments:
+            post_body += "\n\n" + comment["author"] + " wrote: " + comment["comment"]
+
+        post_body = post_title + " " + post_body
+
+        # print(post_body)
+        # Split the text into a list of paragraphs
+        paragraph_list = post_body.split("\n\n")
+        words_per_second = wpm / 60
+        text_clips = []
+        time = 0
+        for i, text in enumerate(paragraph_list):
+            num_words = len(text.split())
+            duration = (num_words / words_per_second)
+            if(num_words > 100): 
+                duration = duration - 8 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 90): 
+                duration = duration - 7 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 80): 
+                duration = duration - 6 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 70): 
+                duration = duration - 5 # kinda works kinda doesnt, better than nothing, needs to be reworked. I think its because of the pauses from the sentences
+            elif(num_words > 60): 
+                duration = duration - 4 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 50): 
+                duration = duration - 3 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 40): 
+                duration = duration - 2 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 30): 
+                duration = duration - 1 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 20): 
+                duration = duration - 0.5 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            elif(num_words > 10): 
+                duration = duration + 1 # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            # duration = (duration - 3) if num_words > 40 else duration # kinda works kinda doesnt, better than nothing, needs to be reworked.
+            # print("Number of words: " + str(num_words))
+            # print(duration)
+            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
+            text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
 
@@ -315,7 +390,8 @@ def createClip(mp3file, post):
         for comment in comments:
             formatted_comments += f"{comment['author']}:\n{comment['comment']}\n\n"
         
-        formatted_comments = formatted_comments + "\n\n" +  "Comment what you think!" + "\n" + \
+        formatted_comments = formatted_comments + \
+            "Comment what you think!" + "\n" + \
             "YTA = You're the Asshole" + " | " + \
             "YWBTA = You Would Be the Asshole" + " | " + \
             "NTA = Not the Asshole" + " | " + \
@@ -328,38 +404,31 @@ def createClip(mp3file, post):
     post = format_text2(post)
 
     audio = AudioFileClip(text_to_speech_pyttsx3(post))
-    video = ImageSequenceClip(screenshot_file, fps=5)
-    video.set_duration(audio.duration)
-    audio_duration = int(audio.duration) + 5
-    text_clips = create_post_text_for_video2(post, audio_duration)
-    # Create a TextClip with the selftext
-    # post_body_text_clip = TextClip(post_body, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align="West", method='caption', size=video_size)
-    # post_body_text_clip.set_duration(audio.duration) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
-    # post_body_text_clip.resize(video_size)
-
-    # Create a composite video of text clips
-    
+    video = ImageSequenceClip(screenshot_file, fps=1)
+    video = video.set_duration(audio.duration)
+    video = video.resize(mobile_video_size)
+    audio_duration = int(audio.duration)
+    text_clips = create_post_text_for_video3(post)
 
     # Add the audio to the video
     background_clip = video.set_audio(audio)
-    intermediate_clip = CompositeVideoClip([background_clip, *text_clips], size=video_size)
-    # intermediate_clip.set_duration(audio_duration)
-    # intermediate_clip.resize(video_size)
-
+    intermediate_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
+    ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
+    final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
+    final_clip.write_videofile(mp4_file)
     # Add the comments section at the end of the video
-    comments = create_comments_text_for_video(post)
-    # comments = format_text(comments)
-    comments_clip = TextClip(comments, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=video_size)
-    comments_clip = comments_clip.set_position("center", "center")
-    comments_clip = comments_clip.set_start(audio.duration)
-    comments_clip = comments_clip.set_end(audio.duration + 20)
+    # comments = create_comments_text_for_video(post)
+    # comments_clip = TextClip(comments, font=font, fontsize=fontsize-4, color=color, align='West', method='caption', size=video_size)
+    # comments_clip = comments_clip.set_position("center", "center")
+    # comments_clip = comments_clip.set_start(audio.duration)
+    # comments_clip = comments_clip.set_end(audio.duration + 20)
 
     # final_clip = CompositeVideoClip([intermediate_clip, comments_clip])
     # print(intermediate_clip.duration)
     # final_duration = (int(comments_clip.duration) + int(intermediate_clip.duration))
-    final_clip = CompositeVideoClip([intermediate_clip, comments_clip]).set_duration(audio.duration + 20) # play comments for 20s
+    # final_clip = CompositeVideoClip([intermediate_clip, comments_clip]).set_duration(audio.duration + 20) # play comments for 20s
 
-    final_clip.write_videofile(mp4_file)
+    # final_clip.write_videofile(mp4_file)
     return mp4_file
 
 def main():
