@@ -277,7 +277,7 @@ def createClip(mp3file, post):
         # return post_body
 
     def create_post_text_for_video2(post, total_tts_time):
-        wpm = 190
+        wpm = 225
         post_title = post["title"]
         post_body = post["selftext"]
         post_body = post_title + " " + post_body
@@ -295,6 +295,7 @@ def createClip(mp3file, post):
             #         print('check!')
             #         duration -= 2
             #         break
+            print("Number of words: " + str(num_words))
             print(duration)
             text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color='transparent', align='West', method='caption', size=text_size)
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration)
