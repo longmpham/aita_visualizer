@@ -9,6 +9,14 @@ from moviepy.editor import *
 from gtts import gTTS
 
 
+acronyms_dict = {
+    "AITA": "Am I the Asshole",
+    "BTW": "By the Way",
+    "OMG": "Oh My God",
+    "HVAC": "Heating, Ventilation, Air Conditioning",
+    # add more acronyms here if needed
+}
+
 def utc_to_relative_time(utc_timestamp):
     now = datetime.utcnow()
     post_time = datetime.utcfromtimestamp(utc_timestamp)
@@ -147,7 +155,7 @@ def text_to_speech_pyttsx3(post):
     text = post["title"] + post["selftext"]
     output_file = "post-text.mp3"
     engine = pyttsx3.init()
-    engine.setProperty('rate', 200)
+    engine.setProperty('rate', 175)
     engine.setProperty('volume', 1)
     engine.setProperty('voice', engine.getProperty('voices')[1].id)
     engine.save_to_file(text, output_file)
@@ -157,7 +165,6 @@ def text_to_speech_pyttsx3(post):
 def text_to_speech_gtts(post):
     text = post["selftext"]
     output_file = "post-text.mp3"
-
     tts = gTTS(text, lang='en')
     tts.save(output_file)
     return output_file
@@ -196,6 +203,40 @@ def format_text(post):
             formatted_post[key] = val
     return formatted_post
 
+def format_text2(post):
+    global acronyms_dict
+    formatted_post = {}
+    for key, val in post.items():
+        if key == 'comments':
+            formatted_comments = []
+            for comment in val:
+                formatted_comment = {}
+                for comment_key, comment_val in comment.items():
+                    if comment_key == 'comment':
+                        formatted_comment_val = comment_val.replace("*", "")
+                        formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_comment_val)
+                        formatted_comment[comment_key] = formatted_comment_val
+                    elif comment_key == 'author':
+                        formatted_comment[comment_key] = comment_val
+                formatted_comments.append(formatted_comment)
+            formatted_post[key] = formatted_comments
+        elif key in ['title', 'selftext']:
+            # Find and replace all acronyms in the text
+            acronyms = re.findall(r'\b[A-Z]{2,}\b', val)
+            for acronym in acronyms:
+                acronym_upper = acronym.upper()
+                if acronym_upper in acronyms_dict:
+                    val = val.replace(acronym, acronyms_dict[acronym_upper])
+                else:
+                    acronyms_dict[acronym_upper] = acronym
+                val = val.replace(acronym, acronym_upper)
+            formatted_val = val.replace("*", "")
+            formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_val)
+            formatted_post[key] = formatted_val
+        else:
+            formatted_post[key] = val
+    return formatted_post
+
 def createClip(mp3file, post):
     screenshot_file = ["screenshot.jpg"] # in a list since we're just using still images.
     mp4_file = "Top AITA of the Day.mp4"
@@ -212,26 +253,55 @@ def createClip(mp3file, post):
     def create_post_text_for_video(post, total_tts_time):
         post_title = post["title"]
         post_body = post["selftext"]
-        post_body = post_title + "\n\n" + post_body
+        post_body = post_title + " " + post_body
 
         # Split the text into a list of paragraphs
         paragraph_list = post_body.split("\n\n")
         step = total_tts_time/len(paragraph_list) #each 15 sec: 0, 15, 30
+        # wpm = 175
+        # words_per_second = wpm / 60
         duration = step
-        t = 0
+        time = 0
         text_clips = []
         for text,i in zip(paragraph_list,range(0,len(paragraph_list))):
-            text_clip = TextClip(text,font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=text_size)
-            text_clip = text_clip.set_start(t)
-            text_clip = text_clip.set_pos('center').set_duration(3 if i==0 else duration)
+            text_clip = TextClip(text,font=font, fontsize=fontsize, color=color, bg_color='transparent', align='West', method='caption', size=text_size)
+            text_clip = text_clip.set_start(time)
+            text_clip = text_clip.set_pos('center').set_duration(duration)
+            # text_clip = text_clip.set_pos('center').set_duration(3 if i==0 else duration)
             text_clips.append(text_clip)  
-            t += 3 if i==0 else step
+            time += step
+            # time += 3 if i==0 else step
             # print(text_clip)
 
         return text_clips
         # return post_body
 
-    # format string to take out any uncessary crap
+    def create_post_text_for_video2(post, total_tts_time):
+        wpm = 190
+        post_title = post["title"]
+        post_body = post["selftext"]
+        post_body = post_title + " " + post_body
+
+        # Split the text into a list of paragraphs
+        paragraph_list = post_body.split("\n\n")
+        words_per_second = wpm / 60
+        text_clips = []
+        time = 0
+        for i, text in enumerate(paragraph_list):
+            num_words = len(text.split())
+            duration = (num_words / words_per_second)
+            # for acronym in acronyms_dict.keys():
+            #     if acronym in text:
+            #         print('check!')
+            #         duration -= 2
+            #         break
+            print(duration)
+            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color='transparent', align='West', method='caption', size=text_size)
+            text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration)
+            text_clips.append(text_clip)
+            time += duration
+
+        return text_clips
 
     def create_comments_text_for_video(post):
         # comments = post["comments"]
@@ -254,13 +324,13 @@ def createClip(mp3file, post):
             "INFO = Not Enough Info"
         return formatted_comments
     
-    post = format_text(post)
+    post = format_text2(post)
 
-    audio = AudioFileClip(mp3file)
+    audio = AudioFileClip(text_to_speech_pyttsx3(post))
     video = ImageSequenceClip(screenshot_file, fps=5)
     video.set_duration(audio.duration)
     audio_duration = int(audio.duration) + 5
-    text_clips = create_post_text_for_video(post, audio_duration)
+    text_clips = create_post_text_for_video2(post, audio_duration)
     # Create a TextClip with the selftext
     # post_body_text_clip = TextClip(post_body, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align="West", method='caption', size=video_size)
     # post_body_text_clip.set_duration(audio.duration) # add 5 seconds to the end of the clip to make sure it's the last thing in the video
