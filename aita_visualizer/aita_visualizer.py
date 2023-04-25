@@ -243,6 +243,7 @@ def createClip(mp3file, post):
 
         total_words = len(post_body.split())
         print(total_words)
+        print(audio_duration)
         wps_from_audio = total_words / audio_duration
         print(wps_from_audio)
         # Split the text into a list of paragraphs
@@ -254,7 +255,7 @@ def createClip(mp3file, post):
             # print(num_sentences)
             num_words = len(text.split())
             # duration = (num_words / words_per_second) - (num_sentences*1.4) # THIS IS SO HARD....... WPM != AUDIO :(
-            duration = num_words * wps_from_audio
+            duration = num_words / wps_from_audio
             if(duration < 0): duration = 1
             text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
             # text_clip_pos = lambda t: (0, -5*i*t)
