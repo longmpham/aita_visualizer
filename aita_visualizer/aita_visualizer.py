@@ -229,7 +229,7 @@ def format_text(post):
 
 def createClip(mp3file, post):
 
-    def create_post_text_for_video(post):
+    def create_post_text_for_video(post, audio_duration):
         words_per_minute = 175 #225 seems like the sweet spot even though its set as 175...
         post_author = post["author"]
         post_title = post["title"]
@@ -241,16 +241,25 @@ def createClip(mp3file, post):
             + post_title + " " + post_body
         text_to_speech_pyttsx3(post_body)
 
+        total_words = len(post_body.split())
+        print(total_words)
+        wps_from_audio = total_words / audio_duration
+        print(wps_from_audio)
         # Split the text into a list of paragraphs
         paragraph_list = post_body.split("\n\n")
         text_clips = []
         time = 0
         for i, text in enumerate(paragraph_list):
-            num_sentences = len(re.findall(r'\b[\w\s,]+\W\s', text)) + 1
+            # num_sentences = len(re.findall(r'\b[\w\s,]+\W\s', text))
+            # print(num_sentences)
             num_words = len(text.split())
-            duration = (num_words / words_per_second) - (num_sentences*1.45) # THIS IS SO HARD....... WPM != AUDIO :(
+            # duration = (num_words / words_per_second) - (num_sentences*1.4) # THIS IS SO HARD....... WPM != AUDIO :(
+            duration = num_words * wps_from_audio
             if(duration < 0): duration = 1
-            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
+            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
+            # text_clip_pos = lambda t: (0, -5*i*t)
+            # text_clip = text_clip.set_pos(text_clip_pos)
+            # text_clip = text_clip.set_start(time).set_duration(duration).set_opacity(opacity)
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
@@ -275,7 +284,6 @@ def createClip(mp3file, post):
         #     time += duration
 
         # Add the comments in snippets here
-        comments_clips = []
         for comment in comments:
             formatted_comment = comment["author"] + " wrote: " + comment["comment"] + "\n\n"
             num_sentences = len(re.findall(r'\b[\w\s,]+\W\s', formatted_comment)) + 1
@@ -312,7 +320,6 @@ def createClip(mp3file, post):
         return formatted_comments
     
     post = format_text(post)
-    # post = post
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
     # todo: replace image with a video?
     mp4_file = "Top AITA of the Day.mp4"
@@ -341,8 +348,8 @@ def createClip(mp3file, post):
     video = ImageSequenceClip(screenshot_file, fps=1)
     video = video.set_duration(audio.duration)
     video = video.resize(mobile_video_size)
-    # audio_duration = int(audio.duration)
-    text_clips = create_post_text_for_video(post)
+    audio_duration = int(audio.duration)
+    text_clips = create_post_text_for_video(post, audio_duration)
 
     # Add the audio to the video
     background_clip = video.set_audio(audio)
