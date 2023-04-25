@@ -7,15 +7,6 @@ import re
 from datetime import datetime, timedelta
 from moviepy.editor import *
 from gtts import gTTS
-import nltk
-from nltk.tokenize import word_tokenize
-nltk.download('punkt')
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
-import string
-nltk.download('stopwords')
-nltk.download('wordnet')
 
 acronyms_dict = {
     "AITA": "Am I the Asshole",
@@ -155,9 +146,6 @@ def combine_post_comments(post, comments):
     # print(type(comments)) # list of dict
     merged_post = post
     merged_post["comments"] = comments
-
-    # clean it from weird crap with nltk
-    # cleaned_post = clean_text_withnltk(merged_post)
     save_json(merged_post)
     return merged_post
 
@@ -360,19 +348,6 @@ def createClip(mp3file, post):
     final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
     return mp4_file
-
-def clean_text_withnltk(data):
-    title = data["title"]
-    selftext = data["selftext"]
-    comments = data["comments"]
-    # Tokenize the text
-    tokens = word_tokenize(selftext)
-
-    # Rejoin the tokens into a cleaned string
-    cleaned_text = ' '.join(tokens)
-    data["selftext"] = cleaned_text
-
-    print(data)
 
 def main():
     # 1. Get all top posts from a subreddit
