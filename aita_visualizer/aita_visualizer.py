@@ -7,18 +7,23 @@ import re
 from datetime import datetime, timedelta
 from moviepy.editor import *
 from gtts import gTTS
+import string
+from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
 
 acronyms_dict = {
-    "AITA": "Am I the Asshole",
+    "AITA": "Am I the A-Hole",
     "BTW": "By the Way",
     "OMG": "Oh My God",
     "HVAC": "Heating, Ventilation, Air Conditioning",
-    "YTA": "You're the Asshole",
-    "YWBTA": "You Would Be the Asshole",
-    "NTA": "Not the Asshole",
-    "YWNBTA": "You Would Not be the Asshole",
+    "YTA": "You're the A-Hole",
+    "YWBTA": "You Would Be the A-Hole",
+    "NTA": "Not the A-Hole",
+    "YWNBTA": "You Would Not be the A-Hole",
     "ESH": "Everyone Sucks Here",
-    "NAH": "No Assholes Here",
+    "NAH": "No A-Holes Here",
     # add more acronyms here if needed
 }
 
@@ -157,12 +162,12 @@ def save_json(post):
 def print_json(json_object):
     print(json.dumps(json_object, indent=2))
 
-def text_to_speech_pyttsx3(post):
+def text_to_speech_pyttsx3(post, output_file="post-text.mp3"):
     if isinstance(post, dict):
         text = post["title"] + post["selftext"]
     else:
         text = post
-    output_file = "post-text.mp3"
+    output_file = output_file
     engine = pyttsx3.init()
     engine.setProperty('rate', 175)
     engine.setProperty('volume', 1)
@@ -188,9 +193,8 @@ def format_text(post):
                 formatted_comment = {}
                 for comment_key, comment_val in comment.items():
                     if comment_key == 'comment':
-                        # Remove links from comment text
-                        comment_val = re.sub(r'http\S+', '', comment_val)
-                        formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', comment_val)
+                        formatted_comment_val = re.sub(r'http\S+', '', comment_val) # Remove links from comment text
+                        formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_comment_val) # Remove mid-sentence newline characters
                         formatted_comment[comment_key] = formatted_comment_val
                     elif comment_key == 'author':
                         formatted_comment[comment_key] = comment_val
@@ -206,16 +210,15 @@ def format_text(post):
                 else:
                     acronyms_dict[acronym_upper] = acronym
                 val = val.replace(acronym, acronym_upper)
-            # Remove links from selftext
-            val = re.sub(r'http\S+', '', val)
-            formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', val)
+            formatted_val = re.sub(r'http\S+', '', val) # Remove links from selftext
+            formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_val) # Remove mid-sentence newline characters
             formatted_post[key] = formatted_val
         else:
             formatted_post[key] = val
         save_json(formatted_post)
     return formatted_post
 
-def createClip(mp3file, post):
+def createClip(post, mp3_file="post-text.mp3"):
 
     def create_post_text_for_video(post, audio_duration):
         # words_per_minute = 175 #225 seems like the sweet spot even though its set as 175...
@@ -324,17 +327,17 @@ def createClip(mp3file, post):
     opacity = 0.75
     ending_comments =  \
         "Comment what you think!" + "\n" + \
-        "YTA = You're the Asshole" + "\n" + \
-        "YWBTA = You Would Be the Asshole" + "\n" + \
-        "NTA = Not the Asshole" + "\n" + \
-        "YWNBTA = You Would Not be the Asshole" + "\n" + \
+        "YTA = You're the A-hole" + "\n" + \
+        "YWBTA = You Would Be the A-hole" + "\n" + \
+        "NTA = Not the A-hole" + "\n" + \
+        "YWNBTA = You Would Not be the A-hole" + "\n" + \
         "ESH = Everyone Sucks Here" + "\n" + \
-        "NAH = No Assholes Here" + "\n" + \
+        "NAH = No A-holes Here" + "\n" + \
         "INFO = Not Enough Info"
-    audio_file = "post-text.mp3"
+    audio_file = mp3_file
 
 
-    audio = AudioFileClip(audio_file)
+    audio = AudioFileClip(text_to_speech_pyttsx3(post, audio_file))
     video = ImageSequenceClip(screenshot_file, fps=1)
     video = video.set_duration(audio.duration)
     video = video.resize(mobile_video_size)
@@ -370,9 +373,9 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    mp3file = text_to_speech_pyttsx3(combined_post)
+    # mp3file = text_to_speech_pyttsx3(combined_post)
     # mp3file = text_to_speech_gtts(combined_post) # I find this too slow... no way to change it
-    mp4file = createClip(mp3file, combined_post)
+    mp4file = createClip(combined_post)
 
     # Anything extra... 
     # print_post(reddit_posts, post_num)
