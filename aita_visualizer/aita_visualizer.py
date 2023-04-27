@@ -24,6 +24,7 @@ acronyms_dict = {
     "YWNBTA": "You Would Not be the A-Hole",
     "ESH": "Everyone Sucks Here",
     "NAH": "No A-Holes Here",
+    "AH": "A-Hole",
     # add more acronyms here if needed
 }
 
@@ -220,19 +221,22 @@ def format_text(post):
 
 def createClip(post, mp3_file="post-text.mp3"):
 
-    def create_post_text_for_video(post, audio_duration):
+    def create_post_text_for_video(post):
         # words_per_minute = 175 #225 seems like the sweet spot even though its set as 175...
         post_author = post["author"]
         post_title = post["title"]
         post_body = post["selftext"]
         comments = post["comments"] # list of dict
+        post_body = "Redditor " + post_author + " wrote:\n" \
+            + post_title + " " + post_body
+        
+        text_to_speech_pyttsx3(post_body)
+        audio = AudioFileClip(text_to_speech_pyttsx3(post))
+        audio_duration = audio.duration
+
         # words_per_second = words_per_minute / 60
         total_words = len(post_body.split())
         wps_from_audio = total_words / audio_duration
-
-        post_body = "Redditor " + post_author + " wrote:\n" \
-            + post_title + " " + post_body
-        text_to_speech_pyttsx3(post_body)
 
         # Split the text into a list of paragraphs
         paragraph_list = post_body.split("\n\n")
@@ -240,7 +244,8 @@ def createClip(post, mp3_file="post-text.mp3"):
         time = 0
         for i, text in enumerate(paragraph_list):
             num_words = len(text.split())
-            duration = (num_words / wps_from_audio) - 2
+            duration = (num_words / wps_from_audio)
+            # duration = ((num_words - (num_words*1.04-num_words)) / wps_from_audio)
             text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
             # text_clip_pos = lambda t: (0, -5*i*t) # used to move text upwards
             # text_clip = text_clip.set_pos(text_clip_pos) # used to move text upwards
@@ -318,8 +323,7 @@ def createClip(post, mp3_file="post-text.mp3"):
     video = ImageSequenceClip(screenshot_file, fps=1)
     video = video.set_duration(audio.duration)
     video = video.resize(mobile_video_size)
-    audio_duration = int(audio.duration)
-    text_clips = create_post_text_for_video(post, audio_duration)
+    text_clips = create_post_text_for_video(post)
 
     # Add the audio to the video
     background_clip = video.set_audio(audio)
