@@ -239,50 +239,38 @@ def createClip(post, mp3_file="post-text.mp3"):
         text_clips = []
         time = 0
         for i, text in enumerate(paragraph_list):
-            # num_sentences = len(re.findall(r'\b[\w\s,]+\W\s', text))
-            # print(num_sentences)
             num_words = len(text.split())
-            # duration = (num_words / words_per_second) - (num_sentences*1.4) # THIS IS SO HARD....... WPM != AUDIO :(
-            duration = num_words / wps_from_audio
-            # if(duration < 0): duration = 1
+            duration = (num_words / wps_from_audio) - 2
             text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
-            # text_clip_pos = lambda t: (0, -5*i*t)
-            # text_clip = text_clip.set_pos(text_clip_pos)
-            # text_clip = text_clip.set_start(time).set_duration(duration).set_opacity(opacity)
+            # text_clip_pos = lambda t: (0, -5*i*t) # used to move text upwards
+            # text_clip = text_clip.set_pos(text_clip_pos) # used to move text upwards
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
 
-        # Split the text into a list of sentences instead
-        # sentence_list = re.findall(r'\b[\w\s,]+\W\s', post_body)
-        # x = 5 # set the number of sentences per sublist
-        # sentence_sublists = [sentence_list[i:i+x] for i in range(0, len(sentence_list), x)]
-
-        # text_clips = []
-        # time = 0
-        # for sublist in sentence_sublists:
-        #     print(sublist)
-        #     text = ''.join(sublist)
-        #     num_words = len(text.split())
-        #     # duration = (num_words / words_per_second) - (len(sublist)*1.45) # THIS IS SO HARD....... WPM != AUDIO :(
-        #     duration = (num_words / words_per_second) # THIS IS SO HARD....... WPM != AUDIO :(
-        #     if(duration < 0): duration = 1
-        #     text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
-        #     text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
-        #     text_clips.append(text_clip)
-        #     time += duration
-
         # Add the comments in snippets here
         for comment in comments:
             formatted_comment = comment["author"] + " wrote: " + comment["comment"] + "\n\n"
-            num_sentences = len(re.findall(r'\b[\w\s,]+\W\s', formatted_comment)) + 1
             num_words = len(text.split())
-            # duration = (num_words / words_per_second) - (num_sentences*1.45) # THIS IS SO HARD....... WPM != AUDIO :(
             duration = 5 # 5 seconds per comment
             text_clip = TextClip(formatted_comment, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
+
+        ending_comments =  \
+            "Comment what you think!" + "\n" + \
+            "YTA = You're the A-hole" + "\n" + \
+            "YWBTA = You Would Be the A-hole" + "\n" + \
+            "NTA = Not the A-hole" + "\n" + \
+            "YWNBTA = You Would Not be the A-hole" + "\n" + \
+            "ESH = Everyone Sucks Here" + "\n" + \
+            "NAH = No A-holes Here" + "\n" + \
+            "INFO = Not Enough Info"
+
+        ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
+        ending_comments_clip = ending_comments_clip.set_start(time).set_pos('center').set_duration(10)
+        text_clips.append(ending_comments_clip)
 
         return text_clips
 
@@ -323,15 +311,6 @@ def createClip(post, mp3_file="post-text.mp3"):
     color='white'
     bg_color='black'
     opacity = 0.75
-    ending_comments =  \
-        "Comment what you think!" + "\n" + \
-        "YTA = You're the A-hole" + "\n" + \
-        "YWBTA = You Would Be the A-hole" + "\n" + \
-        "NTA = Not the A-hole" + "\n" + \
-        "YWNBTA = You Would Not be the A-hole" + "\n" + \
-        "ESH = Everyone Sucks Here" + "\n" + \
-        "NAH = No A-holes Here" + "\n" + \
-        "INFO = Not Enough Info"
     audio_file = mp3_file
 
 
@@ -344,9 +323,9 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     # Add the audio to the video
     background_clip = video.set_audio(audio)
-    intermediate_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
-    final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
+    final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
+    # ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
+    # final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
     return mp4_file
 
