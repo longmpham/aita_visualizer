@@ -234,8 +234,6 @@ def createClip(post, mp3_file="post-text.mp3"):
             + post_title + " " + post_body
         text_to_speech_pyttsx3(post_body)
 
-
-
         # Split the text into a list of paragraphs
         paragraph_list = post_body.split("\n\n")
         text_clips = []
