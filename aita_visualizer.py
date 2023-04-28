@@ -185,24 +185,6 @@ def text_to_speech_gtts(post):
     tts.save(output_file)
     return output_file
 
-import re
-
-acronyms_dict = {
-    "AITA": "Am I the A-Hole",
-    "BTW": "By the Way",
-    "OMG": "Oh My God",
-    "HVAC": "Heating, Ventilation, Air Conditioning",
-    "YTA": "You're the A-Hole",
-    "YWBTA": "You Would Be the A-Hole",
-    "NTA": "Not the A-Hole",
-    "YWNBTA": "You Would Not be the A-Hole",
-    "ESH": "Everyone Sucks Here",
-    "NAH": "No A-Holes Here",
-    "AH": "A-Hole",
-    "asshole": "A-Hole"
-    # add more acronyms here if needed
-}
-
 def format_text_json(post):
     global acronyms_dict
     formatted_post = {}
@@ -236,7 +218,6 @@ def format_text_json(post):
     save_json(formatted_post, "clean_post.json")
     return formatted_post
 
-
 def format_text(post):
     post_author = post["author"]
     post_title = post["title"]
@@ -252,8 +233,6 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     def create_post_text_for_video(post, audio_duration):
         post_body = post        
-        audio_duration = audio_duration
-        # words_per_second = words_per_minute / 60
         total_words = len(post_body.split())
         wps_from_audio = total_words / audio_duration
 
@@ -264,7 +243,6 @@ def createClip(post, mp3_file="post-text.mp3"):
         for i, text in enumerate(paragraph_list):
             num_words = len(text.split())
             duration = (num_words / wps_from_audio)
-            # duration = ((num_words - (num_words*1.04-num_words)) / wps_from_audio) # this kind of worked, but for smaller paragraphs it did not and lost time.
             text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
             # text_clip_pos = lambda t: (0, -5*i*t) # used to move text upwards
             # text_clip = text_clip.set_pos(text_clip_pos) # used to move text upwards
@@ -300,7 +278,6 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     def create_post_text_for_video_scroll(post, audio_duration):
         post_full = post
-        audio_duration = audio_duration
         text_clips = []
 
         # generate the full post text clip
@@ -327,10 +304,10 @@ def createClip(post, mp3_file="post-text.mp3"):
 
         return text_clips
     
-    
     post = format_text_json(post)
     post_full = format_text(post)
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
+    video_files = "sea.mp4"
     # todo: replace image with a video?
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
@@ -343,23 +320,20 @@ def createClip(post, mp3_file="post-text.mp3"):
     fontsize=18
     color='white'
     bg_color='black'
-    opacity = 0.70
+    opacity = 0.60
     audio_file = mp3_file
 
 
 
     audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
-    video = ImageSequenceClip(screenshot_file, fps=1)
+    # video = ImageSequenceClip(screenshot_file, fps=1)
+    video = VideoFileClip(video_files).loop(duration=10)
     video = video.set_duration(audio.duration)
     video = video.resize(mobile_video_size)
     # text_clips = create_post_text_for_video(post_full, audio.duration)
     text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
-    # Add the audio to the video
     background_clip = video.set_audio(audio)
     final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    # final_clip = final_clip.set_duration(audio.duration)
-    # ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size).set_start(intermediate_clip.duration).set_end(intermediate_clip.duration + 5)
-    # final_clip = CompositeVideoClip([intermediate_clip, ending_comments_clip], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
     return mp4_file
 
