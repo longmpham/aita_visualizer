@@ -25,7 +25,9 @@ acronyms_dict = {
     "ESH": "Everyone Sucks Here",
     "NAH": "No A-Holes Here",
     "AH": "A-Hole",
-    "asshole": "A-Hole"
+    "asshole": "A-Hole",
+    "fuck": "F",
+    "fucking": "F-ing",
     # add more acronyms here if needed
 }
 
@@ -240,12 +242,10 @@ def createClip(post, mp3_file="post-text.mp3"):
         paragraph_list = post_body.split("\n\n")
         text_clips = []
         time = 0
-        for i, text in enumerate(paragraph_list):
-            num_words = len(text.split())
+        for i, paragraph in enumerate(paragraph_list):
+            num_words = len(paragraph.split())
             duration = (num_words / wps_from_audio)
-            text_clip = TextClip(text, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
-            # text_clip_pos = lambda t: (0, -5*i*t) # used to move text upwards
-            # text_clip = text_clip.set_pos(text_clip_pos) # used to move text upwards
+            text_clip = TextClip(paragraph, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
             text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
@@ -308,7 +308,6 @@ def createClip(post, mp3_file="post-text.mp3"):
     post_full = format_text(post)
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
     video_files = "sea.mp4"
-    # todo: replace image with a video?
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
@@ -323,18 +322,26 @@ def createClip(post, mp3_file="post-text.mp3"):
     opacity = 0.60
     audio_file = mp3_file
 
-
-
+    # Set up the audio clip from our post to TTS
     audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
+
+    # Set up the video clip from our screenshot or videos
     # video = ImageSequenceClip(screenshot_file, fps=1)
     video = VideoFileClip(video_files).loop(duration=10)
     video = video.set_duration(audio.duration)
     video = video.resize(mobile_video_size)
-    # text_clips = create_post_text_for_video(post_full, audio.duration)
-    text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
+
+    # Set up the text clip overlays for the video
+    text_clips = create_post_text_for_video(post_full, audio.duration)
+    # text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
+
+    # Bind the audio and the video together
     background_clip = video.set_audio(audio)
+
+    # Bind the audio/video to the textclips
     final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
+
     return mp4_file
 
 def main():
