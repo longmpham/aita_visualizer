@@ -3,37 +3,53 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+import requests
+import time
 
-def generate_video(prompt, output_path):
-    # Create a new instance of the Firefox driver
-    driver = webdriver.Firefox()
+def generate_video(prompt):
+    # Launch browser
+    driver = webdriver.Chrome()
+    
+    # Navigate to website
+    # driver.get('https://huggingface.co/spaces/damo-vilab/modelscope-text-to-video-synthesis')
+    driver.get('https://huggingface.co/spaces/NeuralInternet/Text-to-Video_Playground')
+    
+    # # Wait for all input elements to be present on the page
+    # inputs = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.TAG_NAME, "input")))
 
-    # Navigate to the text-to-video generator website
-    driver.get("https://huggingface.co/spaces/NeuralInternet/Text-to-Video_Playground")
+    # # Print the number of input elements found
+    # print(inputs)
 
-    # Find the input box for the prompt and enter the provided text
-    input_box = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "prompt")))
-    input_box.send_keys(prompt)
-    input_box.send_keys(Keys.RETURN)
+    # Find input box and enter prompt
+    # input_box = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, '/html/body/gradio-app/div/div/div/div/div/div[2]/div[1]/div/div[1]/label/input')))
+    # input_box = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="my-test-id"]')))
+    # driver.implicitly_wait(10)
+    # input_box = driver.find_element(By.CSS_SELECTOR, '[data-testid="my-test-id"]')
+    input_box = driver.find_elements(By.TAG_NAME, 'input')
+    print(input_box[0])
 
-    # Wait for the video to finish generating
-    WebDriverWait(driver, 120).until(EC.presence_of_element_located((By.XPATH, "//video[@controls]")))
+    input_box[0].send_keys(prompt)
 
-    # Find the video element and get its source URL
-    video = driver.find_element_by_tag_name("video")
-    video_src = video.get_attribute("src")
-
-    # Download the video to the specified output path
-    response = requests.get(video_src)
-    with open(output_path, "wb") as f:
-        f.write(response.content)
-
-    # Close the browser window
+    time.sleep(5)
+    # input_box2.send_keys(prompt)
+    
+    # Wait for video to load and play
+    # WebDriverWait(driver, 180).until(EC.presence_of_element_located((By.XPATH, '/html/body/gradio-app/div/div/div/div/div/div[2]/div[2]/div/div/div/div/div[2]/div[1]/video')))
+    
+    # Wait for video to finish playing
+    # WebDriverWait(driver, 60).until_not(EC.presence_of_element_located((By.XPATH, '/html/body/gradio-app/div/div/div/div/div/div[2]/div[2]/div/div/div/div/div[2]/div[1]/video')))
+    
+    # Save video
+    # save_button = driver.find_element_by_xpath('/html/body/gradio-app/div/div/div/div/div/div[2]/div[2]/div/div/div/div/div[2]/div[2]/div/button[2]')
+    # save_button.click()
+    
+    # Close browser
     driver.quit()
 
 
 def main(): 
-  generate_video("This is a test prompt", "output.mp4")
+  prompt = "twin brothers eating a cake"
+  generate_video(prompt)
 
 if __name__ == "__main__":
    main()

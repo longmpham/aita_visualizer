@@ -246,12 +246,11 @@ def createClip(post, mp3_file="post-text.mp3"):
         return post_meta
 
     def create_post_text_for_video(post, audio_duration, post_meta, meta_duration):
-        post_body = post        
-        total_words = len(post_body.split())
+        total_words = len(post.split())
         wps_from_audio = total_words / audio_duration
 
         # Split the text into a list of paragraphs
-        paragraph_list = post_body.split("\n\n")
+        paragraph_list = post.split("\n\n")
         text_clips = []
 
         # Add meta textclip
