@@ -28,6 +28,7 @@ acronyms_dict = {
     "asshole": "A-Hole",
     "fuck": "F",
     "fucking": "F-ing",
+    "WIBTA": "would I be the A-Hole",
     # add more acronyms here if needed
 }
 
@@ -233,7 +234,18 @@ def format_text(post):
 
 def createClip(post, mp3_file="post-text.mp3"):
 
-    def create_post_text_for_video(post, audio_duration):
+    def format_meta_text(post):
+        
+        post_author = post["author"]
+        post_title = post["title"]
+        post_ups = post["ups"]
+        post_date = post["date_time"]
+
+        post_meta = "AITA\n" + str(post_ups) + " ups\n" + post_author + " wrote:\n" + post_title + "\n\n" + post_date
+
+        return post_meta
+
+    def create_post_text_for_video(post, audio_duration, post_meta, meta_duration):
         post_body = post        
         total_words = len(post_body.split())
         wps_from_audio = total_words / audio_duration
@@ -241,12 +253,18 @@ def createClip(post, mp3_file="post-text.mp3"):
         # Split the text into a list of paragraphs
         paragraph_list = post_body.split("\n\n")
         text_clips = []
-        time = 0
+
+        # Add meta textclip
+        meta_clip = TextClip(post_meta, font=font, fontsize=fontsize+14, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
+        meta_clip = meta_clip.set_duration(meta_duration).set_position('center') # 5 second opener!
+        text_clips.append(meta_clip) # intro text
+
+        time = meta_duration
         for i, paragraph in enumerate(paragraph_list):
             num_words = len(paragraph.split())
             duration = (num_words / wps_from_audio)
             text_clip = TextClip(paragraph, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
-            text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
+            text_clip = text_clip.set_start(time).set_position('center').set_duration(duration).set_opacity(opacity)
             text_clips.append(text_clip)
             time += duration
 
@@ -306,6 +324,7 @@ def createClip(post, mp3_file="post-text.mp3"):
     
     post = format_text_json(post)
     post_full = format_text(post)
+    post_meta = format_meta_text(post)
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
     video_files = "sea.mp4"
     mp4_file = "Top AITA of the Day.mp4"
@@ -321,18 +340,20 @@ def createClip(post, mp3_file="post-text.mp3"):
     bg_color='black'
     opacity = 0.60
     audio_file = mp3_file
+    meta_duration = 5
 
     # Set up the audio clip from our post to TTS
     audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
+    audio = audio.set_start(meta_duration)
 
     # Set up the video clip from our screenshot or videos
     # video = ImageSequenceClip(screenshot_file, fps=1)
-    video = VideoFileClip(video_files).loop(duration=10)
-    video = video.set_duration(audio.duration)
+    video = VideoFileClip(video_files)
+    video = video.set_start(meta_duration).set_duration(audio.duration).loop(duration=10)
     video = video.resize(mobile_video_size)
 
     # Set up the text clip overlays for the video
-    text_clips = create_post_text_for_video(post_full, audio.duration)
+    text_clips = create_post_text_for_video(post_full, audio.duration, post_meta, meta_duration)
     # text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
 
     # Bind the audio and the video together
