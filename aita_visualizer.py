@@ -347,8 +347,8 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     # Set up the video clip from our screenshot or videos
     # video = ImageSequenceClip(screenshot_file, fps=1)
-    video = VideoFileClip(video_files)
-    video = video.set_start(meta_duration).set_duration(audio.duration).loop(duration=10)
+    video = VideoFileClip(video_files).loop(duration=10)
+    video = video.set_start(meta_duration).set_duration(audio.duration)
     video = video.resize(mobile_video_size)
 
     # Set up the text clip overlays for the video
