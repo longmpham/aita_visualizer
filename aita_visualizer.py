@@ -325,7 +325,8 @@ def createClip(post, mp3_file="post-text.mp3"):
     post_full = format_text(post)
     post_meta = format_meta_text(post)
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
-    video_files = "sea.mp4"
+    background_video_file = "sea.mp4"
+    video_files = os.getcwd() + f"\\resources\\background_videos\\{background_video_file}"
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
@@ -337,30 +338,33 @@ def createClip(post, mp3_file="post-text.mp3"):
     fontsize=18
     color='white'
     bg_color='black'
-    opacity = 0.60
+    opacity = 0.75
     audio_file = mp3_file
     meta_duration = 5
 
     # Set up the audio clip from our post to TTS
     audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
     audio = audio.set_start(meta_duration)
+    print("Audio Set...")
 
     # Set up the video clip from our screenshot or videos
     # video = ImageSequenceClip(screenshot_file, fps=1)
     video = VideoFileClip(video_files).loop(duration=10)
     video = video.set_start(meta_duration).set_duration(audio.duration)
     video = video.resize(mobile_video_size)
+    print("Background Video Set...")
 
     # Set up the text clip overlays for the video
     text_clips = create_post_text_for_video(post_full, audio.duration, post_meta, meta_duration)
     # text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
+    print("Texts Generating...")
 
     # Bind the audio and the video together
     background_clip = video.set_audio(audio)
 
     # Bind the audio/video to the textclips
     final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file)
+    final_clip.write_videofile(mp4_file, threads=4)
 
     return mp4_file
 
@@ -385,8 +389,6 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    # mp3file = text_to_speech_pyttsx3(combined_post)
-    # mp3file = text_to_speech_gtts(combined_post) # I find this too slow... no way to change it
     mp4file = createClip(combined_post)
 
     # Anything extra... 
