@@ -4,14 +4,12 @@ import time
 import json
 import pyttsx3
 import re
+import random
 from datetime import datetime, timedelta
 from moviepy.editor import *
 from gtts import gTTS
-import string
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-
+# from youtube_uploader_selenium import YouTubeUploader
+# from selenium.webdriver.common.by import By
 
 acronyms_dict = {
     "AITA": "Am I the A-Hole",
@@ -238,11 +236,18 @@ def createClip(post, mp3_file="post-text.mp3"):
         
         post_author = post["author"]
         post_title = post["title"]
+        post_body = post["selftext"]
         post_ups = post["ups"]
         post_date = post["date_time"]
 
         post_meta = "AITA\n" + str(post_ups) + " ups\n" + post_author + " wrote:\n" + post_title + "\n\n" + post_date
-
+        post_meta_json = {
+            "title": "Top AITA of the Day | " + post_title,
+            "description": post_title + "wrote: " + post_body,
+            "tags": ["Reddit", "AITA"],
+            # "schedule": "",
+        }
+        save_json(post_meta_json, file_name="yt_meta_data.json")
         return post_meta
 
     def create_post_text_for_video(post, audio_duration, post_meta, meta_duration):
@@ -325,8 +330,10 @@ def createClip(post, mp3_file="post-text.mp3"):
     post_full = format_text(post)
     post_meta = format_meta_text(post)
     screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
-    background_video_file = "sea.mp4"
-    video_files = os.getcwd() + f"\\resources\\background_videos\\{background_video_file}"
+    background_video_dir = ".\\resources\\background_videos"
+    background_video_files  = [f for f in os.listdir(background_video_dir) if f.endswith(".mp4")]
+    background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
+    # video_files = os.getcwd() + f"\\resources\\background_videos\\{background_video_file}"
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
@@ -349,9 +356,10 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     # Set up the video clip from our screenshot or videos
     # video = ImageSequenceClip(screenshot_file, fps=1)
-    video = VideoFileClip(video_files).loop(duration=10)
+    video = VideoFileClip(background_video_file).loop(duration=10)
     video = video.set_start(meta_duration).set_duration(audio.duration)
     video = video.resize(mobile_video_size)
+    background_clip = video.set_audio(audio)
     print("Background Video Set...")
 
     # Set up the text clip overlays for the video
@@ -360,13 +368,19 @@ def createClip(post, mp3_file="post-text.mp3"):
     print("Texts Generating...")
 
     # Bind the audio and the video together
-    background_clip = video.set_audio(audio)
 
     # Bind the audio/video to the textclips
     final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
     final_clip.write_videofile(mp4_file, threads=4)
 
     return mp4_file
+
+# def upload_to_youtube(mp4_file, meta_data_file):
+
+#     uploader = YouTubeUploader(mp4_file, meta_data_file)
+#     was_video_uploaded, video_id = uploader.upload()
+#     assert was_video_uploaded
+#     return
 
 def main():
     # 1. Get all top posts from a subreddit
@@ -381,6 +395,8 @@ def main():
 
     # Variables to choose from...
     url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
+    # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
+    # url = "https://www.reddit.com/subreddits/popular.json"
     post_num = 0  # first (top most post) (usually <25 posts)
     num_of_comments = 3
 
@@ -390,6 +406,8 @@ def main():
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
     mp4file = createClip(combined_post)
+    # meta_data_file = "yt_meta_data.json"
+    # upload_to_youtube(mp4file, meta_data_file)
 
     # Anything extra... 
     # print_post(reddit_posts, post_num)
