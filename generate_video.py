@@ -115,10 +115,30 @@ def download_coverr_video(search_query, item_num=0, save_path="C:\\Users\\longp\
     driver.quit()
     return
 
+def download_hugging_face_gif(search_query):
+
+    # Load Chrome driver and navigate to Coverr
+    driver = webdriver.Chrome()
+    driver.get(f"https://huggingface.co/spaces/damo-vilab/modelscope-text-to-video-synthesis")
+
+    time.sleep(2)
+  
+    # Wait for search input to be loaded and enter search query
+    # search_input = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, '/html/body/gradio-app/div/div/div/div/div/div[2]/div[1]/div/div/div/label/input')))
+    # search_input = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, '//*[@id="prompt-text-input"]/label/input')))
+    search_input = WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.scroll-hide.svelte-4xt1ch')))
+    search_input.send_keys(search_query)
+    search_input.send_keys(Keys.RETURN)
+    print(search_input)
+    time.sleep(20)
+    return
+
 def main(): 
-  prompt = "baby"
+  # prompt = "baby"
+  prompt = "An astronaut riding a horse"
   item_num = 9
-  download_coverr_video(prompt, item_num)
+  # download_hugging_face_gif(prompt) # doesn't work...
+  # download_coverr_video(prompt, item_num)
   # download_video_from_search_from_pixabay(prompt, item_num)
 
 if __name__ == "__main__":

@@ -11,6 +11,10 @@ from gtts import gTTS
 # from youtube_uploader_selenium import YouTubeUploader
 # from selenium.webdriver.common.by import By
 
+# From my files
+from get_screenshot import get_post_screenshot
+from get_screenshot import get_comment_screenshot
+
 acronyms_dict = {
     "AITA": "Am I the A-Hole",
     "BTW": "By the Way",
@@ -155,6 +159,8 @@ def combine_post_comments(post, comments):
     merged_post = post
     merged_post["comments"] = comments
     save_json(merged_post, "post.json")
+    get_post_screenshot(merged_post["url"])
+    get_comment_screenshot(merged_post["url"], 3)
     return merged_post
 
 def save_json(post, file_name="post.json"):
@@ -405,7 +411,7 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    mp4file = createClip(combined_post)
+    # mp4file = createClip(combined_post)
     # meta_data_file = "yt_meta_data.json"
     # upload_to_youtube(mp4file, meta_data_file)
 

@@ -9,7 +9,6 @@ from selenium.webdriver.support import expected_conditions as EC
 
 used_numbers = []
 
-
 def get_post_screenshot(url):
     # Start a new Chrome browser instance
     browser = webdriver.Chrome()
@@ -20,7 +19,7 @@ def get_post_screenshot(url):
 
     # Wait for the element to be visible
     post_element = WebDriverWait(browser, 10).until(
-        EC.visibility_of_element_located((By.XPATH, '//*[@id="t3_137ua7v"]')))
+        EC.visibility_of_element_located((By.XPATH, '/html/body/shreddit-app/div/div[2]/shreddit-post')))
 
     # Take a screenshot of the element
     screenshot = post_element.screenshot_as_png
@@ -57,6 +56,7 @@ def get_comment_screenshot(url, max_num_of_comments=3):
     data = response.json()
     comments_data = data[1]['data']['children']
     # print(comments_data)
+    # comments_list = [x['data']['body'] if x['data'][''] for x in comments_data]
 
     # Start a new Chrome browser instance
     browser = webdriver.Chrome()
@@ -65,15 +65,15 @@ def get_comment_screenshot(url, max_num_of_comments=3):
     browser.get(url)
     browser.maximize_window()
 
-    # Scroll down by 1000 pixels
-    browser.execute_script("window.scrollBy(0, 2000)")
-    time.sleep(3)
+    # Scroll down by n x 1000 pixels
+    for i in range(3):
+        browser.execute_script("window.scrollBy(0, 1000)")
+        time.sleep(3)
 
     for i in range(max_num_of_comments):
         # Get a comment number and the comment post
-        comment_id += 1  # for the top n comments
-        # comment_id = random.randint(3, 10) # for random comments
-        # comment_id = get_new_comment_id()
+        # comment_id += 1  # for the top n comments
+        comment_id = get_new_comment_id()
         post_element = WebDriverWait(browser, 10).until(EC.visibility_of_element_located(
             (By.XPATH, f'//*[@id="comment-tree"]/shreddit-comment[{comment_id}]')))
 
@@ -97,5 +97,5 @@ def get_comment_screenshot(url, max_num_of_comments=3):
     return screenshot_path
 
 
-get_comment_screenshot(
-    "https://www.reddit.com/r/AmItheAsshole/comments/138csc5/wibta_for_spraying_some_kid_with_my_garden_hose/", 3)
+# get_comment_screenshot(
+#     "https://www.reddit.com/r/AmItheAsshole/comments/138csc5/wibta_for_spraying_some_kid_with_my_garden_hose/", 3)
