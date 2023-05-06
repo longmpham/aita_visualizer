@@ -12,8 +12,10 @@ from gtts import gTTS
 # from selenium.webdriver.common.by import By
 
 # From my files
-from get_screenshot import get_post_screenshot
-from get_screenshot import get_comment_screenshot
+# from get_screenshot import get_title_screenshot
+# from get_screenshot import get_post_screenshot
+# from get_screenshot import get_comment_screenshot
+from get_screenshot import get_full_screenshot
 
 acronyms_dict = {
     "AITA": "Am I the A-Hole",
@@ -159,8 +161,10 @@ def combine_post_comments(post, comments):
     merged_post = post
     merged_post["comments"] = comments
     save_json(merged_post, "post.json")
-    get_post_screenshot(merged_post["url"])
-    get_comment_screenshot(merged_post["url"], 3)
+    # get_title_screenshot(merged_post["url"])
+    # get_post_screenshot(merged_post["url"])
+    # get_comment_screenshot(merged_post["url"], 3)
+    # get_full_screenshot(merged_post["url"], 3)
     return merged_post
 
 def save_json(post, file_name="post.json"):
@@ -335,8 +339,9 @@ def createClip(post, mp3_file="post-text.mp3"):
     post = format_text_json(post)
     post_full = format_text(post)
     post_meta = format_meta_text(post)
-    screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
-    background_video_dir = ".\\resources\\background_videos"
+    # screenshot_files = ["screenshot.png"] # in a list since we're just using still images.
+    screenshot_files = get_full_screenshot(post["url"], 3)
+    background_video_dir = os.path.join(os.getcwd(), 'resources', 'background_videos')
     background_video_files  = [f for f in os.listdir(background_video_dir) if f.endswith(".mp4")]
     background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
     # video_files = os.getcwd() + f"\\resources\\background_videos\\{background_video_file}"
