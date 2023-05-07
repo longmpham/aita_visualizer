@@ -340,7 +340,8 @@ def createClip(post, mp3_file="post-text.mp3"):
     post_full = format_text(post)
     post_meta = format_meta_text(post)
     # screenshot_files = ["screenshot.png"] # in a list since we're just using still images.
-    screenshot_files = get_full_screenshot(post["url"], 3)
+    # screenshot_files = get_full_screenshot(post["url"], 3)
+    # screenshot_files_dir = os.path.join(os.getcwd(), 'resources', 'screenshots')
     background_video_dir = os.path.join(os.getcwd(), 'resources', 'background_videos')
     background_video_files  = [f for f in os.listdir(background_video_dir) if f.endswith(".mp4")]
     background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
@@ -365,25 +366,34 @@ def createClip(post, mp3_file="post-text.mp3"):
     audio = audio.set_start(meta_duration)
     print("Audio Set...")
 
-    # Set up the video clip from our screenshot or videos
-    # video = ImageSequenceClip(screenshot_file, fps=1)
+    # Set up the video clip from our screenshot
+    # intro_video = ImageSequenceClip(screenshot_files_dir, fps=1)
+    # intro_video = ImageClip(screenshot_files[0])
+    # intro_video = intro_video.resize((mobile_text_size[0]*0.5, mobile_text_size[1]*0.5)).set_duration(meta_duration).set_position("center")
+    # intro_video = intro_video.resize((intro_video.size[0]*0.3, intro_video.size[0]*0.3)).set_duration(meta_duration).set_position("center")
+    # intro_video = intro_video.set_audio(audio)
+    # print("Intro Video Set...")
+    
+    # Set up the video clip from our background 
     video = VideoFileClip(background_video_file).loop(duration=10)
-    video = video.set_start(meta_duration).set_duration(audio.duration)
-    video = video.resize(mobile_video_size)
+    video = video.set_start(meta_duration).set_duration(audio.duration).resize(mobile_video_size)
     background_clip = video.set_audio(audio)
     print("Background Video Set...")
+    
+    # intermediate_clip = intro_video + video
+    # intermediate_clip = CompositeVideoClip([intro_video, background_clip], size=mobile_video_size)
 
     # Set up the text clip overlays for the video
     text_clips = create_post_text_for_video(post_full, audio.duration, post_meta, meta_duration)
-    # text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
-    print("Texts Generating...")
+    print("Texts Set...")
 
     # Bind the audio and the video together
 
     # Bind the audio/video to the textclips
     final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file, threads=4)
-
+    # final_clip = CompositeVideoClip([intermediate_clip, *text_clips], size=mobile_video_size)
+    final_clip.write_videofile(mp4_file)
+    final_clip.close()
     return mp4_file
 
 # def upload_to_youtube(mp4_file, meta_data_file):
@@ -416,7 +426,7 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    # mp4file = createClip(combined_post)
+    mp4file = createClip(combined_post)
     # meta_data_file = "yt_meta_data.json"
     # upload_to_youtube(mp4file, meta_data_file)
 
