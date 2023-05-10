@@ -401,6 +401,31 @@ def createClip(post, mp3_file="post-text.mp3"):
 #     assert was_video_uploaded
 #     return
 
+def move_video(mp4_file):
+    # Set the source and destination paths
+    mp4_source = os.path.join(os.getcwd(), mp4_file)
+    mp4_dest_folder = os.path.join(os.getcwd(), "resources", "posted_videos")
+    
+    # Create the destination folder if it doesn't exist
+    if not os.path.exists(mp4_dest_folder):
+        os.makedirs(mp4_dest_folder)
+    
+    # Get a list of existing mp4 files in the destination folder
+    existing_mp4_files = [f for f in os.listdir(mp4_dest_folder) if f.endswith(".mp4")]
+    
+    # Determine the next available number for the new filename
+    next_num = len(existing_mp4_files) + 1
+    
+    # Construct the new filename
+    new_mp4_file = f"{os.path.splitext(mp4_file)[0]}#{next_num}.mp4"
+    mp4_dest = os.path.join(mp4_dest_folder, new_mp4_file)
+    
+    # Copy the file to the new destination
+    with open(mp4_source, 'rb') as fsrc, open(mp4_dest, 'wb') as fdest:
+        fdest.write(fsrc.read())
+    
+    return mp4_dest
+
 def main():
     # 1. Get all top posts from a subreddit
     # 2. Get the comments from the top post
@@ -424,9 +449,10 @@ def main():
     reddit_post = get_specific_post(reddit_posts, post_num)
     comments = get_comments(reddit_post['url'], num_of_comments)
     combined_post = combine_post_comments(reddit_post, comments)
-    mp4file = createClip(combined_post)
+    mp4_file = createClip(combined_post)
     # meta_data_file = "yt_meta_data.json"
     # upload_to_youtube(mp4file, meta_data_file)
+    move_video(mp4_file)
 
     # Anything extra... 
     # print_post(reddit_posts, post_num)
