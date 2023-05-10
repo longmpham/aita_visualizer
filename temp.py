@@ -252,6 +252,22 @@ def format_text(post):
 
 def createClip(post, mp3_file="post-text.mp3"):
 
+    def get_video_file():
+        background_video_dir = os.path.join(os.getcwd(), "resources", "background_videos")
+        background_video_files  = [f for f in os.listdir(background_video_dir) if f.endswith(".mp4")]
+        background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
+        return background_video_file
+    
+    def get_screenshot_file():
+        
+        screenshots = []
+        screenshots_dir = os.path.join(os.getcwd(), "resources", "screenshots")
+        # screenshots = [f for f in os.listdir(screenshots_dir) if f.endswith(".png")]
+        screenshots.append(os.path.join(screenshots_dir, "screenshot_title.png"))
+        screenshots.append(os.path.join(screenshots_dir, "screenshot_body.png"))
+        screenshots.append([os.path.join(screenshots_dir, f) for f in os.listdir(screenshots_dir) if "comment" in f])
+        return screenshots
+
     def create_post_text_for_video(post, audio_duration, post_meta, meta_duration):
         total_words = len(post.split())
         wps_from_audio = total_words / audio_duration
@@ -331,11 +347,8 @@ def createClip(post, mp3_file="post-text.mp3"):
     post = format_text_json(post)
     post_full = format_text(post)
     post_meta = format_meta_text(post)
-    screenshot_file = ["screenshot.png"] # in a list since we're just using still images.
-    background_video_dir = ".\\resources\\background_videos"
-    background_video_files  = [f for f in os.listdir(background_video_dir) if f.endswith(".mp4")]
-    background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
-    # video_files = os.getcwd() + f"\\resources\\background_videos\\{background_video_file}"
+    screenshot_files = get_screenshot_file()
+    background_video_file = get_video_file()
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
