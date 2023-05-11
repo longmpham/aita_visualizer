@@ -424,6 +424,9 @@ def move_video(mp4_file):
     with open(mp4_source, 'rb') as fsrc, open(mp4_dest, 'wb') as fdest:
         fdest.write(fsrc.read())
     
+    # Remove the old file
+    os.remove(mp4_source)
+
     return mp4_dest
 
 def main():
