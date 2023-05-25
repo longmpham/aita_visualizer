@@ -532,12 +532,15 @@ def createClip(post, mp3_file="post-text.mp3"):
     #         ((6, 10), 'subs4')]
 
     subtitles = SubtitlesClip(srt_file, generator)
-    subtitles = subtitles.set_position((0.5,0.7), relative=True).set_start(5).set_duration(audio.duration)
+    subtitles = subtitles.set_position(("center",0.75), relative=True).set_start(meta_duration).set_duration(audio.duration)
     # Set up the video clip from our screenshot or videos
     
     # Intro Clip
-    intro_video = ImageClip(screenshot_files[0], duration=meta_duration)
-    intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
+    # intro_video = ImageClip(screenshot_files[0], duration=meta_duration)
+    # intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
+    
+    main_post_video = ImageClip(screenshot_files[0], duration=audio.duration)
+    main_post_video = main_post_video.resize((mobile_text_size[0], 50)).set_position(("center", 0.1), relative=True).set_start(meta_duration).set_duration(audio.duration)
 
     # video = ImageSequenceClip(screenshot_file, fps=1)
     video = VideoFileClip(background_video_file).loop(duration=10)
@@ -552,7 +555,7 @@ def createClip(post, mp3_file="post-text.mp3"):
     print("Texts Generating...")
 
     # Bind the audio/video to the textclips
-    final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
+    final_clip = CompositeVideoClip([background_clip, main_post_video, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
     final_clip.write_videofile(mp4_file)
 
@@ -608,7 +611,7 @@ def main():
     url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
-    post_num = 1  # first (top most post) (usually <25 posts)
+    post_num = 0  # first (top most post) (usually <25 posts)
     num_of_comments = 3
 
     # The logic...
