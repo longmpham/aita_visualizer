@@ -298,5 +298,6 @@ cython_debug/
 [Ll]ocal
 [Ss]cripts
 
-.mp4
-.mp3
+*.mp4
+*.mp3
+*.exe

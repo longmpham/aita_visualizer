@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import requests
 import time
@@ -8,8 +9,17 @@ import random
 from datetime import datetime, timedelta
 from moviepy.editor import *
 from gtts import gTTS
+import unicodedata
 # from youtube_uploader_selenium import YouTubeUploader
 # from selenium.webdriver.common.by import By
+import speech_recognition as sr
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+from pydub.silence import split_on_silence
+from moviepy.video.tools.subtitles import SubtitlesClip
+from get_screenshot import get_full_screenshot
+
+
 
 acronyms_dict = {
     "AITA": "Am I the A-Hole",
@@ -176,7 +186,6 @@ def format_meta_text(post):
     save_json(post_meta_json, file_name="yt_meta_data.json")
     return post_meta
 
-
 def save_json(post, file_name="post.json"):
     file_name = file_name
     with open(file_name, "w") as outfile:
@@ -237,7 +246,45 @@ def format_text_json(post):
         else:
             formatted_post[key] = val
     save_json(formatted_post, "clean_post.json")
+    clean_json_file(input_file="clean_post.json", output_file="super_cleaned_post.json")
     return formatted_post
+
+def clean_json_file(input_file, output_file):
+    def clean_text(text):
+        # Convert to string if input is not already a string
+        if not isinstance(text, str):
+            text = str(text)
+
+        # Remove Unicode characters
+        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+
+        # Remove newlines ("\n")
+        text = re.sub(r"\n+", " ", text)
+        
+        # # Remove Unicode characters
+        # text = re.sub(r"\\u\d{4}", "", text)
+        
+        # Remove other escape characters
+        text = re.sub(r"\\[^\w\s]", "", text)
+        
+        # Remove extra whitespace
+        text = re.sub(r"\s+", " ", text)
+        
+        return text.strip()
+
+    # Load the input JSON file
+    with open(input_file, "r") as file:
+        data = json.load(file)
+
+    # Clean the text in each key-value pair of the JSON data
+    cleaned_data = {}
+    for key, value in data.items():
+        cleaned_value = clean_text(value)
+        cleaned_data[key] = cleaned_value
+
+    # Save the cleaned data to the output JSON file
+    with open(output_file, "w") as file:
+        json.dump(cleaned_data, file, indent=4)
 
 def format_text(post):
     post_author = post["author"]
@@ -250,6 +297,113 @@ def format_text(post):
         post_formatted += "\n\n" + comment["author"] + " wrote:\n" + comment["comment"]
     return post_formatted
 
+def generate_srt_from_audio_by_time_interval(audio_file_path):
+    def format_timedelta(milliseconds):
+        delta = timedelta(milliseconds=milliseconds)
+        seconds = delta.total_seconds()
+        minutes, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        milliseconds = delta.total_seconds() * 1000 % 1000
+        return f"{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f},{milliseconds:03.0f}"
+    
+    # Load the audio file
+    audio = AudioSegment.from_file(audio_file_path, format="mp3")
+
+    # Split the audio into smaller chunks
+    chunk_length_ms = 10000  # Split audio into 10-second chunks
+    chunks = make_chunks(audio, chunk_length_ms)
+
+    # Initialize the speech recognizer
+    recognizer = sr.Recognizer()
+
+    # Create the SRT file path dynamically
+    audio_file_name = os.path.basename(audio_file_path)
+    srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
+    srt_file_path = os.path.join(os.path.dirname(audio_file_path), srt_file_name)
+
+    # Create an SRT file
+    with open(srt_file_path, 'w') as srt_file:
+        for i, chunk in enumerate(chunks):
+            start_time = i * chunk_length_ms
+            end_time = (i + 1) * chunk_length_ms
+
+            # Save the chunk as a temporary WAV file
+            chunk.export("temp.wav", format="wav")
+
+            # Recognize speech from the temporary WAV file
+            with sr.AudioFile("temp.wav") as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+
+            # Write the subtitle to the SRT file
+            subtitle = f"{i+1}\n{format_timedelta(start_time)} --> {format_timedelta(end_time)}\n{text}\n\n"
+            srt_file.write(subtitle)
+
+    return srt_file_path
+
+def generate_srt_from_audio(audio_file_path):
+    def format_timedelta(seconds):
+        delta = timedelta(seconds=seconds)
+        hours = delta.seconds // 3600
+        minutes = (delta.seconds // 60) % 60
+        seconds = delta.seconds % 60
+        milliseconds = delta.microseconds // 1000
+        return f"{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f},{milliseconds:03.0f}"
+
+
+    # Get location of ffmpeg that is required 
+    AudioSegment.converter = os.getcwd()+ "\\ffmpeg.exe"                    
+    AudioSegment.ffprobe   = os.getcwd()+ "\\ffprobe.exe"
+    
+    # Load the audio file
+    # audio = AudioSegment.from_file(audio_file_path, format="mp3", ffmpeg = "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe")
+    audio = AudioSegment.from_file(audio_file_path)
+
+    chunks = split_on_silence(audio,min_silence_len=1000,silence_thresh=-24, keep_silence=True)
+
+    # Initialize the speech recognizer
+    recognizer = sr.Recognizer()
+
+    # Create the SRT file path dynamically
+    audio_file_name = os.path.basename(audio_file_path)
+    srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
+    srt_file_path = os.path.join(os.path.dirname(audio_file_path), srt_file_name)
+    
+    # minimum chunk length
+    target_length = 5 * 1000 # 5 seconds
+    output_chunks = [chunks[0]]
+    for chunk in chunks[1:]:
+        if len(output_chunks[-1]) < target_length:
+            output_chunks[-1] += chunk
+        else:
+            # if the last output chunk
+            # is longer than the target length,
+            # we can start a new one
+            output_chunks.append(chunk)
+            
+    # Create an SRT file
+    time = 0
+    with open(srt_file_path, 'w') as srt_file:
+        for i, chunk in enumerate(output_chunks):
+            start_time = time
+            end_time = time + chunk.duration_seconds
+            time += chunk.duration_seconds
+            print(time)
+
+            # Save the chunk as a temporary WAV file
+            chunk.export("temp.wav", format="wav")
+
+            # Recognize speech from the temporary WAV file
+            with sr.AudioFile("temp.wav") as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+
+            # Write the subtitle to the SRT file
+            subtitle = f"{i+1}\n{format_timedelta(start_time)} --> {format_timedelta(end_time)}\n{text}\n\n"
+            srt_file.write(subtitle)
+
+    return srt_file_path
+
 def createClip(post, mp3_file="post-text.mp3"):
 
     def get_video_file():
@@ -258,14 +412,14 @@ def createClip(post, mp3_file="post-text.mp3"):
         background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
         return background_video_file
     
-    def get_screenshot_file():
-        
-        screenshots = []
-        screenshots_dir = os.path.join(os.getcwd(), "resources", "screenshots")
-        # screenshots = [f for f in os.listdir(screenshots_dir) if f.endswith(".png")]
-        screenshots.append(os.path.join(screenshots_dir, "screenshot_title.png"))
-        screenshots.append(os.path.join(screenshots_dir, "screenshot_body.png"))
-        screenshots.append([os.path.join(screenshots_dir, f) for f in os.listdir(screenshots_dir) if "comment" in f])
+    def get_screenshot_file(post):
+        screenshots = get_full_screenshot(post['url'], max_num_of_comments=3)
+        # screenshots = []
+        # screenshots_dir = os.path.join(os.getcwd(), "resources", "screenshots")
+        # # screenshots = [f for f in os.listdir(screenshots_dir) if f.endswith(".png")]
+        # screenshots.append(os.path.join(screenshots_dir, "screenshot_title.png"))
+        # screenshots.append(os.path.join(screenshots_dir, "screenshot_body.png"))
+        # screenshots.append([os.path.join(screenshots_dir, f) for f in os.listdir(screenshots_dir) if "comment" in f])
         return screenshots
 
     def create_post_text_for_video(post, audio_duration, post_meta, meta_duration):
@@ -281,14 +435,15 @@ def createClip(post, mp3_file="post-text.mp3"):
         meta_clip = meta_clip.set_duration(meta_duration).set_position('center') # 5 second opener!
         text_clips.append(meta_clip) # intro text
 
-        time = meta_duration
-        for i, paragraph in enumerate(paragraph_list):
-            num_words = len(paragraph.split())
-            duration = (num_words / wps_from_audio)
-            text_clip = TextClip(paragraph, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
-            text_clip = text_clip.set_start(time).set_position('center').set_duration(duration).set_opacity(opacity)
-            text_clips.append(text_clip)
-            time += duration
+        time = meta_duration + audio_duration
+        # for i, paragraph in enumerate(paragraph_list):
+        #     if paragraph: 
+        #         num_words = len(paragraph.split())
+        #         duration = (num_words / wps_from_audio)
+        #         text_clip = TextClip(paragraph, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
+        #         text_clip = text_clip.set_start(time).set_position('center').set_duration(duration).set_opacity(opacity)
+        #         text_clips.append(text_clip)
+        #         time += duration
 
         # Add the comments in snippets here
         # for comment in comments:
@@ -313,7 +468,7 @@ def createClip(post, mp3_file="post-text.mp3"):
         ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
         ending_comments_clip = ending_comments_clip.set_start(time).set_pos('center').set_duration(10)
         text_clips.append(ending_comments_clip)
-
+        
         return text_clips
 
     def create_post_text_for_video_scroll(post, audio_duration):
@@ -347,15 +502,15 @@ def createClip(post, mp3_file="post-text.mp3"):
     post = format_text_json(post)
     post_full = format_text(post)
     post_meta = format_meta_text(post)
-    screenshot_files = get_screenshot_file()
+    screenshot_files = get_screenshot_file(post)
     background_video_file = get_video_file()
     mp4_file = "Top AITA of the Day.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
     video_size = width,height
     mobile_video_size = height,width
-    text_size = (int(video_size[0]), int(video_size[1]*0.75)) # 16:9
-    mobile_text_size = (int(video_size[1]), int(video_size[0]*0.75)) # 9:16
+    text_size = (int(video_size[0]), int(video_size[1]*0.9)) # 16:9
+    mobile_text_size = (int(video_size[1]*0.9), int(video_size[0]*0.9)) # 9:16
     font='Arial'
     fontsize=18
     color='white'
@@ -363,16 +518,26 @@ def createClip(post, mp3_file="post-text.mp3"):
     opacity = 0.75
     audio_file = mp3_file
     meta_duration = 5
-
+    TextClip.list('color')
     # Set up the audio clip from our post to TTS
     audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
     audio = audio.set_start(meta_duration)
     print("Audio Set...")
 
+    srt_file = generate_srt_from_audio(audio_file)
+    generator = lambda txt: TextClip(txt, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
+    # subs = [((0, 2), 'subs1'),
+    #         ((2, 4), 'subs2'),
+    #         ((4, 6), 'subs3'),
+    #         ((6, 10), 'subs4')]
+
+    subtitles = SubtitlesClip(srt_file, generator)
+    subtitles = subtitles.set_position((0.5,0.7), relative=True).set_start(5).set_duration(audio.duration)
     # Set up the video clip from our screenshot or videos
     
     # Intro Clip
-    # intro_video = ImageClip(screenshot_files[0], duration=meta_duration)
+    intro_video = ImageClip(screenshot_files[0], duration=meta_duration)
+    intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
 
     # video = ImageSequenceClip(screenshot_file, fps=1)
     video = VideoFileClip(background_video_file).loop(duration=10)
@@ -386,11 +551,10 @@ def createClip(post, mp3_file="post-text.mp3"):
     # text_clips = create_post_text_for_video_scroll(post_full, audio.duration)
     print("Texts Generating...")
 
-    # Bind the audio and the video together
-
     # Bind the audio/video to the textclips
-    final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file, threads=4)
+    final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
+    # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
+    final_clip.write_videofile(mp4_file)
 
     return mp4_file
 
@@ -444,7 +608,7 @@ def main():
     url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
-    post_num = 0  # first (top most post) (usually <25 posts)
+    post_num = 1  # first (top most post) (usually <25 posts)
     num_of_comments = 3
 
     # The logic...
