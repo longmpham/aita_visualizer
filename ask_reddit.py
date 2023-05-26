@@ -401,7 +401,16 @@ def generate_srt_from_audio(audio_file_path):
             # Write the subtitle to the SRT file
             subtitle = f"{i+1}\n{format_timedelta(start_time)} --> {format_timedelta(end_time)}\n{text}\n\n"
             srt_file.write(subtitle)
-        
+            
+    # Read the updated SRT file and modify the first entry
+    with open(srt_file_path, 'r+') as srt_file:
+        lines = srt_file.readlines()
+        if len(lines) > 2:
+            lines[2] = lines[2].replace(lines[2].split(' ')[0], f"Redditor")
+        srt_file.seek(0)
+        srt_file.writelines(lines)
+        srt_file.truncate()
+
     return srt_file_path
 
 def edit_subtitles():
@@ -415,34 +424,37 @@ def generate_concatenated_video(audio_duration, meta_duration, mobile_video_size
         background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
         return background_video_file
 
-    # Calculate the total duration of the concatenated video
-    total_duration = audio_duration
+    # Load the first background video clip
+    background_video_file = get_video_file()
+    video = VideoFileClip(background_video_file)
+
+    # Calculate the number of times the video should be repeated
+    num_repeats = int(audio_duration / video.duration)
+
+    # Calculate the remaining duration after the repeated videos
+    remaining_duration = audio_duration % video.duration
 
     # Create a list to store the video clips
     video_clips = []
 
-    # Iterate over the total duration in increments of 10 seconds
-    for start_time in range(0, int(total_duration), 10):
-        # Get the background video file for this segment
-        background_video_file = get_video_file()
-
-        # Load the background video clip
-        video = VideoFileClip(background_video_file).loop(10)
-
-        # Set the start time and duration of the video clip
-        video = video.set_start(start_time).set_duration(10)
-
-        # Resize the video
-        video = video.resize(mobile_video_size)
-
-        # Add the video clip to the list
+    # Repeat the video for the required number of times
+    for _ in range(num_repeats):
         video_clips.append(video)
+
+    # If there is a remaining duration, add the next video
+    if remaining_duration > 0:
+        next_video_path = get_video_file()  # Get the path of the next video
+        next_video = VideoFileClip(next_video_path)
+        video_clips.append(next_video)
 
     # Concatenate the video clips
     concatenated_video = concatenate_videoclips(video_clips)
 
     # Set the start time and duration of the concatenated video
-    video = concatenated_video.set_start(meta_duration).set_duration(total_duration)
+    video = concatenated_video.set_start(meta_duration).set_duration(audio_duration)
+
+    # Resize the video
+    video = video.resize(mobile_video_size)
 
     return video
 
@@ -469,7 +481,7 @@ def createClip(post, mp3_file="post-text.mp3"):
         wps_from_audio = total_words / audio_duration
 
         # Split the text into a list of paragraphs
-        # paragraph_list = post.split("\n\n")
+        paragraph_list = post.split("\n\n")
         text_clips = []
 
         # Add meta textclip
@@ -560,7 +572,7 @@ def createClip(post, mp3_file="post-text.mp3"):
     opacity = 0.75
     audio_file = mp3_file
     meta_duration = 5
-    # print(TextClip.list('color'))
+    print(TextClip.list('color'))
     
     # The new plan is to make this have:
     # 1. an intro video to show the title, author, date, 
@@ -587,7 +599,7 @@ def createClip(post, mp3_file="post-text.mp3"):
 
     subtitles = SubtitlesClip(srt_file, generator)
     subtitles = subtitles.set_position(("center",0.75), relative=True).set_start(meta_duration).set_duration(audio.duration)
-    # edit_subtitles()
+    edit_subtitles()
     # Set up the video clip from our screenshot or videos
     
     # Intro Clip
@@ -595,9 +607,7 @@ def createClip(post, mp3_file="post-text.mp3"):
     # intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
     
     main_post_image = ImageClip(screenshot_files[0], duration=audio.duration)
-    aspect_ratio = main_post_image.size[0] / main_post_image.size[1]
-    main_post_image_height = int(mobile_video_size[0] / aspect_ratio)
-    main_post_image = main_post_image.resize((mobile_text_size[0], main_post_image_height)).set_position(("center", 0.1), relative=True).set_start(meta_duration).set_duration(audio.duration)
+    main_post_image = main_post_image.resize((mobile_text_size[0], 50)).set_position(("center", 0.1), relative=True).set_start(meta_duration).set_duration(audio.duration)
 
     # video = ImageSequenceClip(screenshot_file, fps=1)
     # video = VideoFileClip(background_video_file).loop(duration=10)
@@ -666,6 +676,7 @@ def main():
 
     # Variables to choose from...
     url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
+    url = "https://www.reddit.com/r/AskReddit/top.json?t=day"
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
     post_num = 0  # first (top most post) (usually <25 posts)

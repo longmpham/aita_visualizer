@@ -133,7 +133,8 @@ def get_full_screenshot(url, max_num_of_comments=3):
 
     # Navigate to the URL
     browser.get(url)
-    browser.maximize_window()
+    # browser.maximize_window()
+    browser.set_window_size(1080, 1920)
 
     # Get the title element
     post_title = WebDriverWait(browser, 10).until(
