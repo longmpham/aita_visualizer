@@ -142,7 +142,7 @@ def get_full_screenshot(url, max_num_of_comments=3):
 
     # Take a screenshot of the element
     screenshots["title"] = post_title.screenshot_as_png
-
+    print("got screenshot of title")
     time.sleep(1)
 
     # Get the post element
@@ -151,24 +151,29 @@ def get_full_screenshot(url, max_num_of_comments=3):
 
     # Take a screenshot of the element
     screenshots["post"] = post_element.screenshot_as_png
+    print("got screenshot of post body")
 
     time.sleep(1)
 
     # Scroll down to load some comments
     for i in range(3):
         browser.execute_script("window.scrollBy(0, 1000)")
-        time.sleep(3)
+        time.sleep(1)
 
     # Get the comment element(s)
     for i in range(max_num_of_comments):
-        comment_id = get_new_comment_id() # gets random comment id from 2-24
-        comment_element = WebDriverWait(browser, 10).until(EC.visibility_of_element_located(
-            (By.XPATH, f'//*[@id="comment-tree"]/shreddit-comment[{comment_id}]')))
+        try:
+            comment_id = get_new_comment_id() # gets random comment id from 2-24
+            comment_element = WebDriverWait(browser, 10).until(EC.visibility_of_element_located(
+                (By.XPATH, f'//*[@id="comment-tree"]/shreddit-comment[{comment_id}]')))
 
-        # Take a screenshot of the element
-        screenshots["comments"].append(comment_element.screenshot_as_png)
+            # Take a screenshot of the element
+            screenshots["comments"].append(comment_element.screenshot_as_png)
+            print("got screenshot of post comments")
 
-        time.sleep(1)
+            time.sleep(2)
+        except:
+            print("couldn't get screenshot")
 
     # Save the screenshot to a file
     screenshot_folder = os.path.join(os.getcwd(), 'resources', 'screenshots')
