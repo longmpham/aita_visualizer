@@ -40,14 +40,15 @@ def generate_TTS_using_coqui(text_prompts):
     tts_files = []
     for i, text in enumerate(text_prompts):
         file_name = f"resources\\audio\\output_{i+1}.wav"
-        tts.tts_to_file(text=text, file_path=file_name)
+        tts.tts_to_file(text=text, file_path=file_name, speed=1.2)
         tts_files.append(file_name)
 
     # Combine audio files
     combined_audio = AudioSegment.empty()
+    silent_audio = AudioSegment.silent(1*1000)
     for file_name in tts_files:
         audio_segment = AudioSegment.from_wav(file_name)
-        combined_audio += audio_segment
+        combined_audio += audio_segment + silent_audio
 
     # Export combined audio to file
     output_file = "post-text.wav"

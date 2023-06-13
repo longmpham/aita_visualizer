@@ -19,27 +19,8 @@ from pydub.silence import split_on_silence
 from moviepy.video.tools.subtitles import SubtitlesClip
 from get_screenshot import get_full_screenshot
 from tts import generate_TTS_using_coqui
-
-
-acronyms_dict = {
-    "AITA": "Am I the A-Hole",
-    "BTW": "By the Way",
-    "OMG": "Oh My God",
-    "HVAC": "Heating, Ventilation, Air Conditioning",
-    "YTA": "You're the A-Hole",
-    "YWBTA": "You Would Be the A-Hole",
-    "NTA": "Not the A-Hole",
-    "YWNBTA": "You Would Not be the A-Hole",
-    "ESH": "Everyone Sucks Here",
-    "NAH": "No A-Holes Here",
-    "AH": "A-Hole",
-    "asshole": "A-Hole",
-    "fuck": "F",
-    "fucking": "F-ing",
-    "WIBTA": "would I be the A-Hole",
-    "AITA?": "Am I The A-Hole?"
-    # add more acronyms here if needed
-}
+from faster_whisper import WhisperModel
+from pathlib import Path
 
 def utc_to_relative_time(utc_timestamp):
     now = datetime.utcnow()
@@ -69,6 +50,12 @@ def get_comments(url, max_num_of_comments=3):
     # get the post body data from data
     comments = []
     for index, comment in enumerate(comments_data[1:max_num_of_comments+1]):
+        # Skip comment if more than 30 words
+        comment_body = comment["data"]["body"]
+        word_count = len(comment_body.split())
+        if word_count > 30:
+            continue
+        
         comments.append({
             "index": str(index+1),
             "author": comment["data"]["author"],
@@ -103,6 +90,9 @@ def get_posts(url):
     # create a list of dictionaries (reddit posts) from the data
     posts = []
     for post in data["data"]["children"]:
+        # if NSFW, go next
+        if post["data"]["over_18"] == True: 
+            continue
         title = post["data"]["title"]
         selftext = post["data"]["selftext"]
         author = post["data"]["author"]
@@ -154,10 +144,6 @@ def print_all_posts(posts):
             "Url: " + post["url"],
             sep='\n',
         )
-
-def get_num_of_posts(posts):
-    print(len(posts))
-    return len(posts)
 
 def combine_post_comments(post, comments, post_index):
     # what is the type of post and comments?
@@ -319,13 +305,13 @@ def format_text(post):
     post_title = post["title"]
     post_body = post["selftext"]
     comments = post["comments"] # list of dict
-    print(type(post))
-    print(type(comments))
-    post_formatted = [post_title, post_body]
+    # print(type(post))
+    # print(type(comments))
+    post_formatted = [f"{post_author} wrote {post_title}", post_body]
     # post_formatted = post_title + post_body
     for comment in comments:
         # print(comment["comment"])
-        post_formatted.append(comment["comment"])
+        post_formatted.append(f"{comment['author']} wrote {comment['comment']}")
         # post_formatted += "\n\n" + comment["comment"]
         # post_formatted += "\n\n" + comment["author"] + " wrote:\n" + comment["comment"]
     # post_formatted += "\n\n" + "Sub, Comment, Like for more!"
@@ -348,7 +334,7 @@ def generate_srt_from_audio_by_time_interval(audio_file_path):
     audio = AudioSegment.from_file(audio_file_path, format="mp3")
 
     # Split the audio into smaller chunks
-    chunk_length_ms = 10000  # Split audio into 10-second chunks
+    chunk_length_ms = 2 *1000  # Split audio into 10-second chunks
     chunks = make_chunks(audio, chunk_length_ms)
 
     # Initialize the speech recognizer
@@ -397,7 +383,7 @@ def generate_srt_from_audio(audio_file_path):
     # audio = AudioSegment.from_file(audio_file_path, format="mp3", ffmpeg = "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe")
     audio = AudioSegment.from_file(audio_file_path)
 
-    chunks = split_on_silence(audio,min_silence_len=1000,silence_thresh=-24, keep_silence=True)
+    chunks = split_on_silence(audio,min_silence_len=200,silence_thresh=-24, keep_silence=True)
 
     # Initialize the speech recognizer
     recognizer = sr.Recognizer()
@@ -439,16 +425,44 @@ def generate_srt_from_audio(audio_file_path):
             # Write the subtitle to the SRT file
             subtitle = f"{i+1}\n{format_timedelta(start_time)} --> {format_timedelta(end_time)}\n{text}\n\n"
             srt_file.write(subtitle)
-            
-    # Read the updated SRT file and modify the first entry
-    # with open(srt_file_path, 'r+') as srt_file:
-    #     lines = srt_file.readlines()
-    #     if len(lines) > 2:
-    #         lines[2] = lines[2].replace(lines[2].split(' ')[0], f"Redditor")
-    #     srt_file.seek(0)
-    #     srt_file.writelines(lines)
-    #     srt_file.truncate()
 
+    return srt_file_path
+
+def generate_srt_from_audio_using_whisper(audio_file_path):
+    
+    def format_timedelta(seconds):
+        delta = timedelta(seconds=seconds)
+        hours = delta.seconds // 3600
+        minutes = (delta.seconds // 60) % 60
+        seconds = delta.seconds % 60
+        milliseconds = delta.microseconds // 1000
+        return f"{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f},{milliseconds:03.0f}"
+    
+    # use large-v2 model and transcribe the audio file
+    model_size = "large-v2"
+    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    segments, info = model.transcribe(audio_file_path, beam_size=5)
+    # segments, _ = model.transcribe(
+    #     "audio.mp3",
+    #     vad_filter=True,
+    #     vad_parameters=dict(min_silence_duration_ms=500), # Vad takes out periods of silence
+    # )
+    # print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
+    
+    # Create the SRT file path dynamically
+    audio_file_name = os.path.basename(audio_file_path)
+    srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
+    srt_file_path = os.getcwd() + f"\\{srt_file_name}"
+    # open a new srt file and save the output from each segment
+    with open(srt_file_path, "w") as srt_file:
+        # Write each segment to the SRT file
+        for index, segment in enumerate(segments, start=1):
+            print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
+            srt_file.write(f"{index}\n")
+            # srt_file.write(f"{segment.start:.2f} --> {segment.end:.2f}\n")
+            srt_file.write(f"{format_timedelta(segment.start)} --> {format_timedelta(segment.end)}\n")
+            srt_file.write(f"{segment.text}\n\n")
+    
     return srt_file_path
 
 def edit_subtitles():
@@ -462,40 +476,64 @@ def generate_concatenated_video(audio_duration, start_duration, mobile_video_siz
         background_video_file = os.path.join(background_video_dir, random.choice(background_video_files))
         return background_video_file
 
-    # Load the first background video clip
-    background_video_file = get_video_file()
-    video = VideoFileClip(background_video_file)
-
-    # Calculate the number of times the video should be repeated
-    num_repeats = int(audio_duration / video.duration)
-
-    # Calculate the remaining duration after the repeated videos
-    remaining_duration = audio_duration % video.duration
-    print(f'remaining duration: {remaining_duration}')
-    # Create a list to store the video clips
+    video_duration = 0.0
     video_clips = []
+    video_clip = VideoFileClip(get_video_file())
+    video_duration += video_clip.duration
+    video_clips.append(video_clip)
+    # print(f"first video dur: {video_clip.duration}")
+    while video_duration < audio_duration:
+        video_clip = VideoFileClip(get_video_file())
+        video_clip = video_clip.resize(mobile_video_size)
+        
+        if video_clip.duration <= audio_duration - video_duration:
+            video_clips.append(video_clip)
+            video_duration += video_clip.duration
+        else:
+            video_clip = video_clip.subclip(0, audio_duration - video_duration)
+            video_clips.append(video_clip)
+            video_duration = audio_duration
+    
+    # Concatenate all the video clips together and return it
+    concatenated_videos = concatenate_videoclips(video_clips)
+    final_video = concatenated_videos.set_start(start_duration).set_duration(audio_duration).resize(mobile_video_size)
+    return final_video
 
-    # Repeat the video for the required number of times
-    for _ in range(num_repeats):
-        video_clips.append(video)
 
-    # If there is a remaining duration, add the next video
-    if remaining_duration > 0:
-        print('getting new video...')
-        next_video_path = get_video_file()  # Get the path of the next video
-        next_video = VideoFileClip(next_video_path)
-        video_clips.append(next_video)
+    # # Load the first background video clip
+    # background_video_file = get_video_file()
+    # video = VideoFileClip(background_video_file)
 
-    # Concatenate the video clips
-    concatenated_video = concatenate_videoclips(video_clips)
+    # # Calculate the number of times the video should be repeated
+    # num_repeats = int(audio_duration / video.duration)
 
-    # Set the start time and duration of the concatenated video
-    video = concatenated_video.set_start(start_duration).set_duration(audio_duration)
+    # # Calculate the remaining duration after the repeated videos
+    # remaining_duration = audio_duration % video.duration
+    # print(f'remaining duration: {remaining_duration}')
+    # # Create a list to store the video clips
+    # video_clips = []
 
-    # Resize the video
-    video = video.resize(mobile_video_size)
+    # # Repeat the video for the required number of times
+    # for _ in range(num_repeats):
+    #     video_clips.append(video)
 
-    return video
+    # # If there is a remaining duration, add the next video
+    # if remaining_duration > 0:
+    #     print('getting new video...')
+    #     next_video_path = get_video_file()  # Get the path of the next video
+    #     next_video = VideoFileClip(next_video_path)
+    #     video_clips.append(next_video)
+
+    # # Concatenate the video clips
+    # concatenated_video = concatenate_videoclips(video_clips)
+
+    # # Set the start time and duration of the concatenated video
+    # video = concatenated_video.set_start(start_duration).set_duration(audio_duration)
+
+    # # Resize the video
+    # video = video.resize(mobile_video_size)
+
+    # return video
 
 def create_clip(post, index):
 
@@ -515,7 +553,7 @@ def create_clip(post, index):
         # screenshots.append([os.path.join(screenshots_dir, f) for f in os.listdir(screenshots_dir) if "comment" in f])
         return screenshots
 
-    def create_post_text_for_video(post, audio_duration, post_meta, start_duration):
+    def create_post_text_for_video(post, audio_duration, start_duration):
         # total_words = len(post.split())
         # wps_from_audio = total_words / audio_duration
 
@@ -527,7 +565,7 @@ def create_clip(post, index):
         title = post['title']
         # print(title)
         title_clip = TextClip(title, font=font, fontsize=fontsize+10, color='black', bg_color='white', align='West', method='caption', size=(mobile_text_size[0],None))
-        title_clip = title_clip.set_duration(audio_duration).set_position('top')
+        title_clip = title_clip.set_duration(audio_duration).set_position(("center",0.2), relative=True).set_opacity(opacity)
         text_clips.append(title_clip) # intro text
 
         # time = start_duration + audio_duration
@@ -619,12 +657,14 @@ def create_clip(post, index):
     
     # Set up the audio clip from our post to TTS
     # audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
-    print(post_full)
-    audio = AudioFileClip(generate_TTS_using_coqui(post_full))
+    # print(post_full)
+    # audio = AudioFileClip(generate_TTS_using_coqui(post_full))
+    audio = AudioFileClip(audio_file)
     audio = audio.set_start(start_duration)
-    print("Audio Set...")
 
-    srt_file = generate_srt_from_audio(audio_file)
+    # srt_file = generate_srt_from_audio(audio_file)
+    srt_file = generate_srt_from_audio_using_whisper(audio_file)
+    # srt_file = "C:\\Users\\longp\\Documents\\Coding\\aita_visualizer\\post-text.srt"
     generator = lambda txt: TextClip(txt, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
     # subs = [((0, 2), 'subs1'),
     #         ((2, 4), 'subs2'),
@@ -632,12 +672,12 @@ def create_clip(post, index):
     #         ((6, 10), 'subs4')]
 
     subtitles = SubtitlesClip(srt_file, generator)
-    subtitles = subtitles.set_position(("center","center"), relative=True).set_start(start_duration).set_duration(audio.duration).set_opacity(opacity) # middle of screen
-    # subtitles = subtitles.set_position(("center",0.75), relative=True).set_start(start_duration).set_duration(audio.duration) # bottom of screen
-    edit_subtitles()
+    subtitles = subtitles.set_position(("center",0.8), relative=True).set_start(start_duration).set_duration(audio.duration) # bottom of screen
+    # subtitles = subtitles.set_position(("center","center"), relative=True).set_start(start_duration).set_duration(audio.duration).set_opacity(opacity) # middle of screen
+    # edit_subtitles()
     print("Subtitles Set...")
-    # Set up the video clip from our screenshot or videos
     
+    # Set up the video clip from our screenshot or videos
     # Intro Clip
     # intro_video = ImageClip(screenshot_files[0], duration=start_duration)
     # intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
@@ -654,7 +694,7 @@ def create_clip(post, index):
     print("Background Video Set...")
 
     # Set up the text clip overlays for the video
-    # text_clips = create_post_text_for_video(post, audio.duration, post_meta, start_duration)
+    text_clips = create_post_text_for_video(post, audio.duration, start_duration)
     print("Texts Generating...")
 
     # Bind the audio/video to the textclips
@@ -662,7 +702,9 @@ def create_clip(post, index):
     # final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, main_post_image, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file)
+    final_clip.write_videofile(mp4_file, threads=4)
+    background_clip.close()
+    subtitles.close()
     final_clip.close()
 
     time.sleep(3)
