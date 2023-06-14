@@ -22,6 +22,61 @@ from tts import generate_TTS_using_coqui
 from faster_whisper import WhisperModel
 from pathlib import Path
 
+
+bad_words = ["@$$","ahole","amcik","andskota","anus","arschloch","arse","ash0le",
+             "asholes","ass","assface","assh0le","assh0lez","asshole","assholz",
+             "assmonkey","assrammer","asswipe","ayir","azzhole","b00bs","b17ch",
+             "b1tch","bassterds","bastard","bastardz","basterds","basterdz","bch",
+             "bi7ch","biatch","bich","bitch","blowjob","boffing","boiolas","bollock",
+             "boobs","breasts","btch","buceta","bullshit","butthole","buttpirate",
+             "buttwipe","c0ck","c0k","cabron","carpetmuncher","cawk","cazzo","chink",
+             "chraa","chuj","cipa","clit","cnts","cntz","cock","cockhead","cocksucker",
+             "crap","cum","cunt","cuntz","d4mn","damn","daygo","dego","dick","dike",
+             "dild0","dild0s","dildo","dilld0","dilld0s","dirsa","dominatricks",
+             "dominatrics","dominatrix","dupa","dyke","dziwka","ejackulate","ejakulate"
+             ,"ekrem","ekto","enculer","enema","faen","fag","fag1t","faget","fagg1t",
+             "faggit","faggot","fagit","fagz","faig","fanculo","fanny","fart","fatass",
+             "fcuk","feces","feg","felcher","ficken","fitt","flikker","flipping","foreskin",
+             "fotze","fuchah","fuck","fucka","fucker","fuckin","fucking","fudgepacker",
+             "fukah","fuken","fuker","fukin","fukka","fukkah","fukken","fukker","fukkin",
+             "futkretzn","fux0r","g00k","gay","gaybor","gayboy","gaygirl","gayz","goddamned",
+             "gook","guiena","h00r","h0ar","h0r","h0re","h4x0r","hell","helvete","hoar",
+             "hoer","honkey","hoor","hoore","hore","huevon","hui","injun","jackoff","jap",
+             "jerkoff","jisim","jism","jiss","jizm","jizz","kanker","kawk","kike","klootzak",
+             "knob","knobz","knulle","kraut","kuksuger","kunt","kuntz","kurac","kurwa",
+             "kusi","kyrpa",l3i+"ch","l3itch","lesbian","lesbo","lezzian","lipshits",
+             "lipshitz","mamhoon","masochist","masokist","massterbait","masstrbait",
+             "masstrbate","masterbaiter","masterbat","masterbat3","masterbate","masturbat",
+             "masturbate","merd","mibun","mofo","monkleigh","motha","mothafucker",
+             "mothafuker","mothafukkah","mothafukker","motherfucker","motherfukah",
+             "motherfuker","motherfukkah","motherfukker","mouliewop","muie","mulkku",
+             "muschi","mutha","muthafucker","muthafukah","muthafuker","muthafukkah",
+             "muthafukker","n1gr","nastt","nasty","nazi","nepesaurio","nigga","niggas",
+             "nigger","nigur","niiger","niigr","nutsack","orafis","orgasim","orgasm",
+             "orgasum","oriface","orifice","orifiss","orospu","p0rn","packi","packie",
+             "packy","paki","pakie","paky","paska","pecker","peeenus","peeenusss","peenus",
+             "peinus","pen1s","penas","penis","penisbreath","penus","penuus","perse",
+             "phuc","phuck","phuk","phuker","phukker","picka","pierdol","pillu","pimmel",
+             "pimpis","piss","pizda","polac","polack","polak","poonani","poontsee","poop",
+             "porn","pr0n","pr1c","pr1ck","pr1k","preteen","pula","pule","pusse","pussee",
+             "pussy","puta","puto","puuke","puuker","qahbeh","queef","queer","queerz",
+             "qweers","qweerz","qweir","rautenberg","recktum","rectum","retard","s.o.b.",
+             "sadist","scank","schaffer","scheiss","schlampe","schlong","schmuck","screw",
+             "scrotum","semen","sex","sexx","sexxx","sexy","sh1ter","sh1ts","sh1tter","sh1tz",
+             "sharmuta","sharmute","shemale","shi+","shipal","shit","shitt","shitter","shitty",
+             "shity","shitz","shiz","shyte","shytty","skanck","skank","skankee","skankey",
+             "skanky","skrib","slut","slutty","slutz","smut","sonofabitch","sx","teets",
+             "teez","testical","testicle","tit","titt","turd","va1jina","vag1na","vagiina",
+             "vagina","vaj1na","vajina","vullva","vulva","w00se","w0p","wank","wh00r","wh0re",
+             "whoar","whore","xrated","xxx"]
+
+def censor_keywords(text, bad_words=bad_words):
+    for keyword in bad_words:
+        pattern = re.compile(r'\b(' + re.escape(keyword) + r'\w+)\b', flags=re.IGNORECASE)
+        text = pattern.sub(lambda m: m.group(1)[0] + '*' * (len(m.group(1)) - 1), text)
+    
+    return text
+
 def utc_to_relative_time(utc_timestamp):
     now = datetime.utcnow()
     post_time = datetime.utcfromtimestamp(utc_timestamp)
@@ -49,22 +104,30 @@ def get_comments(url, max_num_of_comments=3):
 
     # get the post body data from data
     comments = []
-    for index, comment in enumerate(comments_data[1:max_num_of_comments+1]):
+    for index, comment in enumerate(comments_data):
         # Skip comment if more than 30 words
         comment_body = comment["data"]["body"]
         word_count = len(comment_body.split())
+        print(word_count)
         if word_count > 30:
+            continue
+        if comment_body == "[removed]":
             continue
         
         comments.append({
             "index": str(index+1),
             "author": comment["data"]["author"],
-            "comment": comment["data"]["body"],
+            # "comment": comment["data"]["body"],
+            "comment": censor_keywords(comment_body),
             "ups": str(comment["data"]["ups"]),
             "utc_timestamp": comment["data"]["created_utc"],
             "relative_time": utc_to_relative_time(comment["data"]["created_utc"]),
-            "date_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(comment["data"]["created_utc"]))
+            "date_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(comment["data"]["created_utc"]))            
         })
+        # Check if three comments have been appended
+        if len(comments) == max_num_of_comments:
+            break
+        
     return comments
 
 def print_comments(comments):
@@ -91,8 +154,10 @@ def get_posts(url):
     posts = []
     for post in data["data"]["children"]:
         # if NSFW, go next
+        print(post["data"]["over_18"])
         if post["data"]["over_18"] == True: 
             continue
+        
         title = post["data"]["title"]
         selftext = post["data"]["selftext"]
         author = post["data"]["author"]
@@ -564,7 +629,7 @@ def create_clip(post, index):
         # Add meta textclip
         title = post['title']
         # print(title)
-        title_clip = TextClip(title, font=font, fontsize=fontsize+10, color='black', bg_color='white', align='West', method='caption', size=(mobile_text_size[0],None))
+        title_clip = TextClip(title, font="Impact", fontsize=fontsize+10, color='black', bg_color='white', align='West', method='caption', size=(mobile_text_size[0],None))
         title_clip = title_clip.set_duration(audio_duration).set_position(("center",0.2), relative=True).set_opacity(opacity)
         text_clips.append(title_clip) # intro text
 
@@ -640,7 +705,7 @@ def create_clip(post, index):
     # screenshot_files = get_screenshot_file(post)
     # background_video_file = get_video_file()
     mp3_file = "post-text.wav"
-    mp4_file = f"Top Reddit Questions of the Day {index+1} #shorts #questions #curious #random #funny #fyp #reddit.mp4"
+    mp4_file = f"Top Reddit Questions of Today {index+1} #shorts #questions #curious #random #funny #fyp #reddit.mp4"
     width = 720
     height = int(width*9/16) # 16/9 screen
     video_size = width,height
@@ -658,8 +723,8 @@ def create_clip(post, index):
     # Set up the audio clip from our post to TTS
     # audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
     # print(post_full)
-    # audio = AudioFileClip(generate_TTS_using_coqui(post_full))
-    audio = AudioFileClip(audio_file)
+    audio = AudioFileClip(generate_TTS_using_coqui(post_full))
+    # audio = AudioFileClip(audio_file)
     audio = audio.set_start(start_duration)
 
     # srt_file = generate_srt_from_audio(audio_file)
@@ -698,8 +763,8 @@ def create_clip(post, index):
     print("Texts Generating...")
 
     # Bind the audio/video to the textclips
-    final_clip = CompositeVideoClip([background_clip, subtitles], size=mobile_video_size)
-    # final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
+    # final_clip = CompositeVideoClip([background_clip, subtitles], size=mobile_video_size)
+    final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, main_post_image, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
     final_clip.write_videofile(mp4_file, threads=4)
@@ -764,7 +829,7 @@ def main():
     # url = "https://www.reddit.com/subreddits/popular.json"
     # post_num = 0  # first (top most post) (usually <25 posts)
     num_of_comments = 3
-    number_of_posts = 3
+    number_of_posts = 10
     # The logic...
     reddit_posts = get_posts(url)
     
