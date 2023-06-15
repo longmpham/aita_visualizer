@@ -10,9 +10,9 @@ from pydub import AudioSegment
 
 coqui_speaker_list = [
     "tts_models/en/jenny/jenny", # OK
+    "tts_models/en/ljspeech/tacotron2-DDC", # BUGS OUT SOMETIMES
     "tts_models/en/ljspeech/tacotron2-DCA", #BAD
     "tts_models/en/ljspeech/glow-tts", #BAD
-    "tts_models/en/ljspeech/tacotron2-DDC", #BAD
     "tts_models/en/ljspeech/fast_pitch", #OK
     "tts_models/en/multi-dataset/tortoise-v2", #OK but long time and different results
     "tts_models/uk/mai/glow-tts", # BAD
@@ -27,6 +27,8 @@ coqui_speaker_list = [
 
 # Text prompts comes in as a list of strings
 def generate_TTS_using_coqui(text_prompts):
+    # print(TTS.list_models())
+    # exit()
     # In terminal type below to get list of speaker names.
     # tts --list_models
 
@@ -39,19 +41,19 @@ def generate_TTS_using_coqui(text_prompts):
     # Text to speech to a file
     tts_files = []
     for i, text in enumerate(text_prompts):
-        file_name = f"resources\\audio\\output_{i+1}.wav"
-        tts.tts_to_file(text=text, file_path=file_name, speed=1.2)
+        file_name = f"resources\\temp\\output_{i+1}.wav"
+        tts.tts_to_file(text=text, file_path=file_name, speed=2.0)
         tts_files.append(file_name)
 
     # Combine audio files
     combined_audio = AudioSegment.empty()
-    silent_audio = AudioSegment.silent(1*1000)
+    silent_audio = AudioSegment.silent(0.5*1000)
     for file_name in tts_files:
         audio_segment = AudioSegment.from_wav(file_name)
         combined_audio += audio_segment + silent_audio
 
     # Export combined audio to file
-    output_file = "post-text.wav"
+    output_file = "resources\\temp\\post_text.wav"
     combined_audio.export(output_file, format="wav")
 
     return output_file

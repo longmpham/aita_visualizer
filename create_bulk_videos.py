@@ -21,61 +21,12 @@ from get_screenshot import get_full_screenshot
 from tts import generate_TTS_using_coqui
 from faster_whisper import WhisperModel
 from pathlib import Path
+from better_profanity import profanity
 
 
-bad_words = ["@$$","ahole","amcik","andskota","anus","arschloch","arse","ash0le",
-             "asholes","ass","assface","assh0le","assh0lez","asshole","assholz",
-             "assmonkey","assrammer","asswipe","ayir","azzhole","b00bs","b17ch",
-             "b1tch","bassterds","bastard","bastardz","basterds","basterdz","bch",
-             "bi7ch","biatch","bich","bitch","blowjob","boffing","boiolas","bollock",
-             "boobs","breasts","btch","buceta","bullshit","butthole","buttpirate",
-             "buttwipe","c0ck","c0k","cabron","carpetmuncher","cawk","cazzo","chink",
-             "chraa","chuj","cipa","clit","cnts","cntz","cock","cockhead","cocksucker",
-             "crap","cum","cunt","cuntz","d4mn","damn","daygo","dego","dick","dike",
-             "dild0","dild0s","dildo","dilld0","dilld0s","dirsa","dominatricks",
-             "dominatrics","dominatrix","dupa","dyke","dziwka","ejackulate","ejakulate"
-             ,"ekrem","ekto","enculer","enema","faen","fag","fag1t","faget","fagg1t",
-             "faggit","faggot","fagit","fagz","faig","fanculo","fanny","fart","fatass",
-             "fcuk","feces","feg","felcher","ficken","fitt","flikker","flipping","foreskin",
-             "fotze","fuchah","fuck","fucka","fucker","fuckin","fucking","fudgepacker",
-             "fukah","fuken","fuker","fukin","fukka","fukkah","fukken","fukker","fukkin",
-             "futkretzn","fux0r","g00k","gay","gaybor","gayboy","gaygirl","gayz","goddamned",
-             "gook","guiena","h00r","h0ar","h0r","h0re","h4x0r","hell","helvete","hoar",
-             "hoer","honkey","hoor","hoore","hore","huevon","hui","injun","jackoff","jap",
-             "jerkoff","jisim","jism","jiss","jizm","jizz","kanker","kawk","kike","klootzak",
-             "knob","knobz","knulle","kraut","kuksuger","kunt","kuntz","kurac","kurwa",
-             "kusi","kyrpa",l3i+"ch","l3itch","lesbian","lesbo","lezzian","lipshits",
-             "lipshitz","mamhoon","masochist","masokist","massterbait","masstrbait",
-             "masstrbate","masterbaiter","masterbat","masterbat3","masterbate","masturbat",
-             "masturbate","merd","mibun","mofo","monkleigh","motha","mothafucker",
-             "mothafuker","mothafukkah","mothafukker","motherfucker","motherfukah",
-             "motherfuker","motherfukkah","motherfukker","mouliewop","muie","mulkku",
-             "muschi","mutha","muthafucker","muthafukah","muthafuker","muthafukkah",
-             "muthafukker","n1gr","nastt","nasty","nazi","nepesaurio","nigga","niggas",
-             "nigger","nigur","niiger","niigr","nutsack","orafis","orgasim","orgasm",
-             "orgasum","oriface","orifice","orifiss","orospu","p0rn","packi","packie",
-             "packy","paki","pakie","paky","paska","pecker","peeenus","peeenusss","peenus",
-             "peinus","pen1s","penas","penis","penisbreath","penus","penuus","perse",
-             "phuc","phuck","phuk","phuker","phukker","picka","pierdol","pillu","pimmel",
-             "pimpis","piss","pizda","polac","polack","polak","poonani","poontsee","poop",
-             "porn","pr0n","pr1c","pr1ck","pr1k","preteen","pula","pule","pusse","pussee",
-             "pussy","puta","puto","puuke","puuker","qahbeh","queef","queer","queerz",
-             "qweers","qweerz","qweir","rautenberg","recktum","rectum","retard","s.o.b.",
-             "sadist","scank","schaffer","scheiss","schlampe","schlong","schmuck","screw",
-             "scrotum","semen","sex","sexx","sexxx","sexy","sh1ter","sh1ts","sh1tter","sh1tz",
-             "sharmuta","sharmute","shemale","shi+","shipal","shit","shitt","shitter","shitty",
-             "shity","shitz","shiz","shyte","shytty","skanck","skank","skankee","skankey",
-             "skanky","skrib","slut","slutty","slutz","smut","sonofabitch","sx","teets",
-             "teez","testical","testicle","tit","titt","turd","va1jina","vag1na","vagiina",
-             "vagina","vaj1na","vajina","vullva","vulva","w00se","w0p","wank","wh00r","wh0re",
-             "whoar","whore","xrated","xxx"]
-
-def censor_keywords(text, bad_words=bad_words):
-    for keyword in bad_words:
-        pattern = re.compile(r'\b(' + re.escape(keyword) + r'\w+)\b', flags=re.IGNORECASE)
-        text = pattern.sub(lambda m: m.group(1)[0] + '*' * (len(m.group(1)) - 1), text)
-    
-    return text
+def censor_keywords(text):
+    censored_text = profanity.censor(text)
+    return censored_text
 
 def utc_to_relative_time(utc_timestamp):
     now = datetime.utcnow()
@@ -108,17 +59,15 @@ def get_comments(url, max_num_of_comments=3):
         # Skip comment if more than 30 words
         comment_body = comment["data"]["body"]
         word_count = len(comment_body.split())
-        print(word_count)
         if word_count > 30:
             continue
-        if comment_body == "[removed]":
+        if comment_body == "[removed]" or comment_body == "[deleted]":
             continue
-        
         comments.append({
             "index": str(index+1),
             "author": comment["data"]["author"],
-            # "comment": comment["data"]["body"],
-            "comment": censor_keywords(comment_body),
+            "comment": comment["data"]["body"],
+            # "comment": censor_keywords(comment_body),
             "ups": str(comment["data"]["ups"]),
             "utc_timestamp": comment["data"]["created_utc"],
             "relative_time": utc_to_relative_time(comment["data"]["created_utc"]),
@@ -154,7 +103,7 @@ def get_posts(url):
     posts = []
     for post in data["data"]["children"]:
         # if NSFW, go next
-        print(post["data"]["over_18"])
+        # print(post["data"]["over_18"])
         if post["data"]["over_18"] == True: 
             continue
         
@@ -216,7 +165,7 @@ def combine_post_comments(post, comments, post_index):
     # print(type(comments)) # list of dict
     merged_post = post
     merged_post["comments"] = comments
-    file_name = f"post_{post_index}.json"
+    file_name = f"resources\\temp\\post_{post_index}.json"
     save_json(merged_post, file_name)
     clean_json_file(file_name, file_name)
     json_data = load_json_file(file_name)
@@ -239,10 +188,10 @@ def format_meta_text(post):
         "tags": ["Reddit", "AITA"],
         # "schedule": "",
     }
-    save_json(post_meta_json, file_name="yt_meta_data.json")
+    save_json(post_meta_json, file_name="resources\\temp\\yt_meta_data.json")
     return post_meta
 
-def save_json(post, file_name="post.json"):
+def save_json(post, file_name="resources\\temp\\post.json"):
     file_name = file_name
     with open(file_name, "w") as outfile:
         # Write the JSON data to the file with indentation for readability
@@ -251,7 +200,7 @@ def save_json(post, file_name="post.json"):
 def print_json(json_object):
     print(json.dumps(json_object, indent=2))
 
-def text_to_speech_pyttsx3(post, output_file="post-text.wav"):
+def text_to_speech_pyttsx3(post, output_file="resources\\temp\\post_text.wav"):
     text = post
     if isinstance(post, dict):
         text = post["title"] + post["selftext"]
@@ -266,44 +215,10 @@ def text_to_speech_pyttsx3(post, output_file="post-text.wav"):
 
 def text_to_speech_gtts(post):
     text = post["selftext"]
-    output_file = "post-text.wav"
+    output_file = "resources\\temp\\post_text.wav"
     tts = gTTS(text, lang='en')
     tts.save(output_file)
     return output_file
-
-def format_text_json(post):
-    global acronyms_dict
-    formatted_post = {}
-    for key, val in post.items():
-        if key == 'comments':
-            formatted_comments = []
-            for comment in val:
-                formatted_comment = {}
-                for comment_key, comment_val in comment.items():
-                    if comment_key == 'comment':
-                        for word in comment_val.split():
-                            if word in acronyms_dict:
-                                comment_val = comment_val.replace(word, acronyms_dict[word])                        
-                        formatted_comment_val = re.sub(r'http\S+', '', comment_val) # Remove links from comment text
-                        formatted_comment_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_comment_val) # Remove mid-sentence newline characters
-                        formatted_comment[comment_key] = formatted_comment_val
-                    elif comment_key == 'author':
-                        formatted_comment[comment_key] = comment_val
-                formatted_comments.append(formatted_comment)
-            formatted_post[key] = formatted_comments
-        elif key in ['title', 'selftext']:
-            # Find and replace all keys from custom dictionary in the text
-            for word in val.split():
-                if word in acronyms_dict:
-                    val = val.replace(word, acronyms_dict[word])
-            formatted_val = re.sub(r'http\S+', '', val) # Remove links from selftext
-            formatted_val = re.sub(r'(?<=[a-z., ]{2})\n(?!\n)', '', formatted_val) # Remove mid-sentence newline characters
-            formatted_post[key] = formatted_val
-        else:
-            formatted_post[key] = val
-    save_json(formatted_post, "clean_post.json")
-    clean_json_file(input_file="clean_post.json", output_file="super_cleaned_post.json")
-    return formatted_post
 
 def clean_json_file(input_file, output_file):
     def clean_text(text):
@@ -354,7 +269,7 @@ def clean_json_file(input_file, output_file):
     cleaned_data = clean_dictionary_values(data)
     
     # Save the cleaned data to the output JSON file
-    save_json(cleaned_data, file_name="post.json")
+    save_json(cleaned_data, file_name="resources\\temp\\post.json")
     # with open(output_file, "w") as file:
     #     json.dump(cleaned_data, file, indent=4)
 
@@ -372,11 +287,12 @@ def format_text(post):
     comments = post["comments"] # list of dict
     # print(type(post))
     # print(type(comments))
-    post_formatted = [f"{post_author} wrote {post_title}", post_body]
+    post_formatted = [f"{post_author} wrote",f"{post_title}", post_body]
     # post_formatted = post_title + post_body
     for comment in comments:
         # print(comment["comment"])
-        post_formatted.append(f"{comment['author']} wrote {comment['comment']}")
+        post_formatted.append(f"{comment['author']} wrote")
+        post_formatted.append(f"{comment['comment']}")
         # post_formatted += "\n\n" + comment["comment"]
         # post_formatted += "\n\n" + comment["author"] + " wrote:\n" + comment["comment"]
     # post_formatted += "\n\n" + "Sub, Comment, Like for more!"
@@ -417,10 +333,10 @@ def generate_srt_from_audio_by_time_interval(audio_file_path):
             end_time = (i + 1) * chunk_length_ms
 
             # Save the chunk as a temporary WAV file
-            chunk.export("temp.wav", format="wav")
+            chunk.export("resources\\temp\\temp.wav", format="wav")
 
             # Recognize speech from the temporary WAV file
-            with sr.AudioFile("temp.wav") as source:
+            with sr.AudioFile("resources\\temp\\temp.wav") as source:
                 audio_data = recognizer.record(source)
                 text = recognizer.recognize_google(audio_data)
 
@@ -439,10 +355,9 @@ def generate_srt_from_audio(audio_file_path):
         milliseconds = delta.microseconds // 1000
         return f"{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f},{milliseconds:03.0f}"
 
-
     # Get location of ffmpeg that is required 
-    AudioSegment.converter = os.getcwd()+ "\\ffmpeg.exe"                    
-    AudioSegment.ffprobe   = os.getcwd()+ "\\ffprobe.exe"
+    AudioSegment.converter = os.getcwd()+ "\\resources\\ffmpeg\\ffmpeg.exe"                    
+    AudioSegment.ffprobe   = os.getcwd()+ "\\resources\\ffmpeg\\ffprobe.exe"
     
     # Load the audio file
     # audio = AudioSegment.from_file(audio_file_path, format="mp3", ffmpeg = "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe")
@@ -506,6 +421,7 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     # use large-v2 model and transcribe the audio file
     model_size = "large-v2"
     model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    # print(audio_file_path)
     segments, info = model.transcribe(audio_file_path, beam_size=5)
     # segments, _ = model.transcribe(
     #     "audio.mp3",
@@ -517,22 +433,20 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     # Create the SRT file path dynamically
     audio_file_name = os.path.basename(audio_file_path)
     srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
-    srt_file_path = os.getcwd() + f"\\{srt_file_name}"
+    srt_file_path = os.getcwd() + f"\\resources\\temp\\{srt_file_name}"
+    
     # open a new srt file and save the output from each segment
     with open(srt_file_path, "w") as srt_file:
         # Write each segment to the SRT file
         for index, segment in enumerate(segments, start=1):
             print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
+            # print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, censor_keywords(segment.text)))
             srt_file.write(f"{index}\n")
             # srt_file.write(f"{segment.start:.2f} --> {segment.end:.2f}\n")
             srt_file.write(f"{format_timedelta(segment.start)} --> {format_timedelta(segment.end)}\n")
             srt_file.write(f"{segment.text}\n\n")
     
     return srt_file_path
-
-def edit_subtitles():
-    
-    return
 
 def generate_concatenated_video(audio_duration, start_duration, mobile_video_size):
     def get_video_file():
@@ -600,7 +514,7 @@ def generate_concatenated_video(audio_duration, start_duration, mobile_video_siz
 
     # return video
 
-def create_clip(post, index):
+def create_clip(post, index, file_name):
 
     def get_video_file():
         background_video_dir = os.path.join(os.getcwd(), "resources", "background_videos")
@@ -704,8 +618,8 @@ def create_clip(post, index):
     # post_meta = format_meta_text(post)
     # screenshot_files = get_screenshot_file(post)
     # background_video_file = get_video_file()
-    mp3_file = "post-text.wav"
-    mp4_file = f"Top Reddit Questions of Today {index+1} #shorts #questions #curious #random #funny #fyp #reddit.mp4"
+    mp3_file = "resources\\temp\\post_text.wav"
+    mp4_file = file_name.replace("_", str(index+1))
     width = 720
     height = int(width*9/16) # 16/9 screen
     video_size = width,height
@@ -729,7 +643,6 @@ def create_clip(post, index):
 
     # srt_file = generate_srt_from_audio(audio_file)
     srt_file = generate_srt_from_audio_using_whisper(audio_file)
-    # srt_file = "C:\\Users\\longp\\Documents\\Coding\\aita_visualizer\\post-text.srt"
     generator = lambda txt: TextClip(txt, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
     # subs = [((0, 2), 'subs1'),
     #         ((2, 4), 'subs2'),
@@ -739,7 +652,6 @@ def create_clip(post, index):
     subtitles = SubtitlesClip(srt_file, generator)
     subtitles = subtitles.set_position(("center",0.8), relative=True).set_start(start_duration).set_duration(audio.duration) # bottom of screen
     # subtitles = subtitles.set_position(("center","center"), relative=True).set_start(start_duration).set_duration(audio.duration).set_opacity(opacity) # middle of screen
-    # edit_subtitles()
     print("Subtitles Set...")
     
     # Set up the video clip from our screenshot or videos
@@ -767,7 +679,8 @@ def create_clip(post, index):
     final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, main_post_image, *text_clips, subtitles], size=mobile_video_size)
     # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file, threads=4)
+    final_clip.write_videofile(mp4_file, threads=16)
+    
     background_clip.close()
     subtitles.close()
     final_clip.close()
@@ -776,16 +689,8 @@ def create_clip(post, index):
     
     return mp4_file
 
-# def upload_to_youtube(mp4_file, meta_data_file):
-
-#     uploader = YouTubeUploader(mp4_file, meta_data_file)
-#     was_video_uploaded, video_id = uploader.upload()
-#     assert was_video_uploaded
-#     return
-
-def move_video(mp4_file):
+def move_video(mp4_files):
     # Set the source and destination paths
-    mp4_source = os.path.join(os.getcwd(), mp4_file)
     mp4_dest_folder = os.path.join(os.getcwd(), "resources", "posted_videos")
     
     # Create the destination folder if it doesn't exist
@@ -795,21 +700,29 @@ def move_video(mp4_file):
     # Get a list of existing mp4 files in the destination folder
     existing_mp4_files = [f for f in os.listdir(mp4_dest_folder) if f.endswith(".mp4")]
     
-    # Determine the next available number for the new filename
-    next_num = len(existing_mp4_files) + 1
+    moved_files = []
     
-    # Construct the new filename
-    new_mp4_file = f"{os.path.splitext(mp4_file)[0]}#{next_num}.mp4"
-    mp4_dest = os.path.join(mp4_dest_folder, new_mp4_file)
+    for mp4_file in mp4_files:
+        mp4_source = os.path.join(os.getcwd(), mp4_file)
+        
+        # Determine the next available number for the new filename
+        next_num = len(existing_mp4_files) + 1
+        
+        # Construct the new filename
+        new_mp4_file = f"{os.path.splitext(mp4_file)[0]}#{next_num}.mp4"
+        mp4_dest = os.path.join(mp4_dest_folder, new_mp4_file)
+        
+        # Copy the file to the new destination
+        with open(mp4_source, 'rb') as fsrc, open(mp4_dest, 'wb') as fdest:
+            fdest.write(fsrc.read())
+        
+        # Remove the old file
+        os.remove(mp4_source)
+        
+        moved_files.append(mp4_dest)
+        existing_mp4_files.append(new_mp4_file)
     
-    # Copy the file to the new destination
-    with open(mp4_source, 'rb') as fsrc, open(mp4_dest, 'wb') as fdest:
-        fdest.write(fsrc.read())
-    
-    # Remove the old file
-    os.remove(mp4_source)
-
-    return mp4_dest
+    return moved_files
 
 def main():
     # 1. Get all top posts from a subreddit
@@ -828,12 +741,14 @@ def main():
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
     # post_num = 0  # first (top most post) (usually <25 posts)
+    number_of_posts = 15
     num_of_comments = 3
-    number_of_posts = 10
-    # The logic...
+    file_name = f"Top Reddit Questions of Today _ #shorts #questions #curious #random #funny #fyp #reddit.mp4"
+    # Get Reddit posts from url
     reddit_posts = get_posts(url)
     
     json_posts = []
+    
     for i, post in enumerate(reddit_posts):
         if i > number_of_posts:
             break
@@ -851,12 +766,12 @@ def main():
     for i, post in enumerate(json_posts):
         if i > number_of_posts:
             break
-        mp4_file = create_clip(post, i)
+        mp4_file = create_clip(post, i, file_name)
         mp4_files.append(mp4_file)
     # mp4_file = create_clip(combined_post)
     # meta_data_file = "yt_meta_data.json"
     # upload_to_youtube(mp4file, meta_data_file)
-    # move_video(mp4_file)
+    # move_video(mp4_files)
 
     # Anything extra... 
     # print_post(reddit_posts, post_num)
