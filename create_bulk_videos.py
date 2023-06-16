@@ -23,6 +23,7 @@ from tts import generate_TTS_using_coqui
 from faster_whisper import WhisperModel
 from pathlib import Path
 from better_profanity import profanity
+from tqdm import tqdm
 
 
 def delete_temp(folder_path="resources\\temp"):
@@ -89,7 +90,7 @@ def get_comments(url, max_num_of_comments=3):
         if comment_body == "[removed]" or comment_body == "[deleted]":
             continue
         ups = comment["data"].get("ups",1)
-        print(f"{index} - Ups: {ups}")
+        # print(f"{index} - Ups: {ups}")
         comments.append({
             "index": str(index+1),
             "author": comment["data"]["author"],
@@ -200,24 +201,6 @@ def combine_post_comments(post, comments, post_index):
     return json_data
     # return merged_post
 
-def format_meta_text(post):
-    
-    post_author = post["author"]
-    post_title = post["title"]
-    post_body = post["selftext"]
-    post_ups = post["ups"]
-    post_date = post["date_time"]
-
-    post_meta = "AITA\n" + str(post_ups) + " ups\n" + post_author + " wrote:\n" + post_title + "\n\n" + post_date
-    post_meta_json = {
-        "title": "Top AITA of the Day | " + post_title,
-        "description": post_title + "wrote: " + post_body,
-        "tags": ["Reddit", "AITA"],
-        # "schedule": "",
-    }
-    save_json(post_meta_json, file_name="resources\\temp\\yt_meta_data.json")
-    return post_meta
-
 def save_json(post, file_name):
     with open(file_name, "w") as outfile:
         # Write the JSON data to the file with indentation for readability
@@ -239,11 +222,43 @@ def text_to_speech_pyttsx3(post, output_file="resources\\temp\\audio\\post_text.
     engine.runAndWait()
     return output_file
 
-def text_to_speech_gtts(post):
-    text = post["selftext"]
+def text_to_speech_gtts(sentences):
+    def delete_temp_audio(folder_path="resources\\temp\\audio"):
+        # If temp folder is found, delete it
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+
+        # Create the folder
+        os.mkdir(folder_path)
+        
+        return
+    
+    delete_temp_audio()
+    
+    # Combine audio files
+    silence_time = 1 # seconds
+    sample_rate = 16000
+    audio_speed = 1.25
+
+    # Initialize an empty AudioSegment object with the desired sample rate
+    combined_audio = AudioSegment.silent(duration=silence_time*100, frame_rate=sample_rate)
+
+    # generate the audio and combine them with a short silence after each sentence
+    index = 0
+    for sentence in tqdm(sentences, desc="Generating Speech..."):
+        output_file = f"resources\\temp\\audio\\post_text_{index}.wav"
+        tts = gTTS(sentence, lang='en')
+        tts.save(output_file)
+        audio_segment = AudioSegment.from_file(output_file)
+        combined_audio += audio_segment.set_frame_rate(sample_rate)  # Set the frame rate to the desired sample rate
+        index += 1
+
+    # Speed audio up
+    combined_audio = combined_audio.speedup(playback_speed=audio_speed)
+
+    # Export combined audio to file
     output_file = "resources\\temp\\audio\\post_text.wav"
-    tts = gTTS(text, lang='en')
-    tts.save(output_file)
+    combined_audio.export(output_file, format="wav")
     return output_file
 
 def clean_json_file(input_file, output_file):
@@ -615,9 +630,10 @@ def create_clip(post, index, file_name):
     start_duration = 0
     
     # Set up the audio clip from our post to TTS
+    audio = AudioFileClip(text_to_speech_gtts(post_full))
     # audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
     # print(post_full)
-    audio = AudioFileClip(generate_TTS_using_coqui(post_full))
+    # audio = AudioFileClip(generate_TTS_using_coqui(post_full))
     # audio = AudioFileClip(audio_file)
     audio = audio.set_start(start_duration)
 
@@ -692,16 +708,19 @@ def move_video(mp4_files):
     return moved_files
 
 def main():
-
+        
     # Variables to choose from...
     # url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
     url = "https://www.reddit.com/r/AskReddit/top.json?t=day"
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
     # post_num = 0  # first (top most post) (usually <25 posts)
-    number_of_posts = 15
+    number_of_posts = 1 #14
     num_of_comments = 3
-    file_name = f"Top Reddit Questions of Today _ #shorts #questions #curious #random #funny #fyp #reddit.mp4"
+
+    now = datetime.utcnow()
+    formatted_date = now.strftime("%b.%d.%Y")
+    file_name = f"Top Reddit Questions of {formatted_date} _ #shorts #questions #curious #random #funny #fyp #reddit.mp4"
     
     
     # Clean start and delete temp folder
@@ -713,7 +732,7 @@ def main():
     # get all posts and their comments
     json_posts = []
     for i, post in enumerate(reddit_posts):
-        if i > number_of_posts:
+        if i >= number_of_posts:
             break
         # post = get_specific_post(reddit_posts, i)
         post_comment = get_comments(post['url'], num_of_comments)
