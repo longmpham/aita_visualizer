@@ -244,14 +244,12 @@ def text_to_speech_gtts(sentences):
     combined_audio = AudioSegment.silent(duration=silence_time*100, frame_rate=sample_rate)
 
     # generate the audio and combine them with a short silence after each sentence
-    index = 0
-    for sentence in tqdm(sentences, desc="Generating Speech..."):
-        output_file = f"resources\\temp\\audio\\post_text_{index}.wav"
+    for i, sentence in tqdm(enumerate(sentences), desc="Generating Speech", total=len(sentences)):
+        output_file = f"resources\\temp\\audio\\post_text_{i}.wav"
         tts = gTTS(sentence, lang='en')
         tts.save(output_file)
         audio_segment = AudioSegment.from_file(output_file)
         combined_audio += audio_segment.set_frame_rate(sample_rate)  # Set the frame rate to the desired sample rate
-        index += 1
 
     # Speed audio up
     combined_audio = combined_audio.speedup(playback_speed=audio_speed)
@@ -465,7 +463,7 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     # open a new srt file and save the output from each segment
     with open(srt_file_path, "w") as srt_file:
         # Write each segment to the SRT file
-        for index, segment in enumerate(segments, start=1):
+        for index, segment in tqdm(enumerate(segments, start=1), desc="Writing SRT", total=len(segments)):
             print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
             # print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, censor_keywords(segment.text)))
             srt_file.write(f"{index}\n")
