@@ -1,39 +1,54 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import shutil
 from pydub import AudioSegment
-# import numpy as np
-
 from moviepy.editor import *
-
 from TTS.api import TTS
 from pydub import AudioSegment
+from shutil import which
 
 coqui_speaker_list = [
-    "tts_models/en/jenny/jenny", # OK
-    "tts_models/en/ljspeech/tacotron2-DDC", # BUGS OUT SOMETIMES
-    "tts_models/en/ljspeech/tacotron2-DCA", #BAD
-    "tts_models/en/ljspeech/glow-tts", #BAD
+    "tts_models/en/jenny/jenny", # OK 
+    "tts_models/en/ljspeech/tacotron2-DDC_ph", # OK
     "tts_models/en/ljspeech/fast_pitch", #OK
+    "tts_models/en/ljspeech/glow-tts", #WORKS 4
+    "tts_models/en/ljspeech/tacotron2-DCA", #BAD 3
     "tts_models/en/multi-dataset/tortoise-v2", #OK but long time and different results
-    "tts_models/uk/mai/glow-tts", # BAD
-    "tts_models/uk/mai/vits", # BAD
-    "tts_models/en/blizzard2013/capacitron-t2-c150_v2", # doesnt work
-    "tts_models/en/sam/tacotron-DDC", # doesn't work
-    "tts_models/en/ljspeech/neural_hmm", # doesn't work
-    "tts_models/en/ljspeech/fast_pitch", # OK
-    "tts_models/en/ljspeech/overflow", # doesn't work
+    "tts_models/en/ljspeech/speedy-speech", # 6 error kernel size blah blah
+    "tts_models/en/ljspeech/tacotron2-DDC", # BUGS OUT SOMETIMES
+    "tts_models/en/ljspeech/vits--neon", # 8 #needs Espeakng
+    "tts_models/en/ljspeech/vits", # needs espeakng
+    "tts_models/en/vctk/vits", # needs espeakng
+    "vocoder_models/en/ljspeech/hifigan_v2", # 11
+    "vocoder_models/en/ljspeech/multiband-melgan",
+    "vocoder_models/en/ljspeech/univnet",
+    "vocoder_models/universal/libri-tts/fullband-melgan",
 ]
 
 
 # Text prompts comes in as a list of strings
 def generate_TTS_using_coqui(text_prompts):
-    # print(TTS.list_models())
+    def delete_temp_audio(folder_path="resources\\temp\\audio"):
+        # If temp folder is found, delete it
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+
+        # Create the folder
+        os.mkdir(folder_path)
+        
+        return
+    
+    # Print models available for free use
+    # for model in TTS.list_models():
+    #     print(model)
     # exit()
     # In terminal type below to get list of speaker names.
     # tts --list_models
 
+    # Clear old audio files
+    delete_temp_audio()
+
     # Init TTS
-    tts = TTS(model_name=coqui_speaker_list[0], progress_bar=True, gpu=False)
+    tts = TTS(model_name=coqui_speaker_list[1], progress_bar=True, gpu=False)
     # Run TTS
     # ❗ Since this model is multi-speaker and multi-lingual, we must set the target speaker and the language
     # Text to speech with a numpy output
@@ -41,7 +56,7 @@ def generate_TTS_using_coqui(text_prompts):
     # Text to speech to a file
     tts_files = []
     for i, text in enumerate(text_prompts):
-        file_name = f"resources\\temp\\output_{i+1}.wav"
+        file_name = f"resources\\temp\\audio\\output_{i+1}.wav"
         tts.tts_to_file(text=text, file_path=file_name, speed=2.0)
         tts_files.append(file_name)
 
@@ -52,10 +67,12 @@ def generate_TTS_using_coqui(text_prompts):
         audio_segment = AudioSegment.from_wav(file_name)
         combined_audio += audio_segment + silent_audio
 
-    # Export combined audio to file
-    output_file = "resources\\temp\\post_text.wav"
-    combined_audio.export(output_file, format="wav")
+    # Speed audio up
+    combined_audio = combined_audio.speedup(playback_speed=1.2)
 
+    # Export combined audio to file
+    output_file = "resources\\temp\\audio\\post_text.wav"
+    combined_audio.export(output_file, format="wav")
     return output_file
 
 

@@ -6,6 +6,7 @@ import json
 import pyttsx3
 import re
 import random
+import shutil
 from datetime import datetime, timedelta
 from moviepy.editor import *
 from gtts import gTTS
@@ -23,6 +24,17 @@ from faster_whisper import WhisperModel
 from pathlib import Path
 from better_profanity import profanity
 
+
+def delete_temp(folder_path="resources\\temp"):
+    # If temp folder is found, delete it
+    if os.path.exists(folder_path):
+        shutil.rmtree(folder_path)
+
+    # Create the folder
+    os.mkdir(folder_path)
+    os.mkdir(folder_path + "\\audio")
+    
+    return
 
 def censor_keywords(text):
     censored_text = profanity.censor(text)
@@ -53,6 +65,19 @@ def get_comments(url, max_num_of_comments=3):
     data = response.json()
     comments_data = data[1]['data']['children']
 
+    # # update comments_ups to 0 if none is found for sorting
+    # for comment in comments_data:
+    #     if "ups" in comment["data"] and not comment["data"]["ups"]:
+    #         comment["data"]["ups"] = 1
+
+    # Sort comments_data by largest "ups"
+    comments_data.sort(key=lambda comment: comment["data"].get("ups",1), reverse=True)
+    # Print the sorted comments
+    # for i, comment in enumerate(comments_data):
+    #     ups = comment["data"].get("ups",1)
+    #     print(f"{i} - Ups: {ups}")
+    # exit()
+    
     # get the post body data from data
     comments = []
     for index, comment in enumerate(comments_data):
@@ -63,6 +88,8 @@ def get_comments(url, max_num_of_comments=3):
             continue
         if comment_body == "[removed]" or comment_body == "[deleted]":
             continue
+        ups = comment["data"].get("ups",1)
+        print(f"{index} - Ups: {ups}")
         comments.append({
             "index": str(index+1),
             "author": comment["data"]["author"],
@@ -76,7 +103,7 @@ def get_comments(url, max_num_of_comments=3):
         # Check if three comments have been appended
         if len(comments) == max_num_of_comments:
             break
-        
+    
     return comments
 
 def print_comments(comments):
@@ -191,8 +218,7 @@ def format_meta_text(post):
     save_json(post_meta_json, file_name="resources\\temp\\yt_meta_data.json")
     return post_meta
 
-def save_json(post, file_name="resources\\temp\\post.json"):
-    file_name = file_name
+def save_json(post, file_name):
     with open(file_name, "w") as outfile:
         # Write the JSON data to the file with indentation for readability
         json.dump(post, outfile, indent=4)
@@ -200,7 +226,7 @@ def save_json(post, file_name="resources\\temp\\post.json"):
 def print_json(json_object):
     print(json.dumps(json_object, indent=2))
 
-def text_to_speech_pyttsx3(post, output_file="resources\\temp\\post_text.wav"):
+def text_to_speech_pyttsx3(post, output_file="resources\\temp\\audio\\post_text.wav"):
     text = post
     if isinstance(post, dict):
         text = post["title"] + post["selftext"]
@@ -215,7 +241,7 @@ def text_to_speech_pyttsx3(post, output_file="resources\\temp\\post_text.wav"):
 
 def text_to_speech_gtts(post):
     text = post["selftext"]
-    output_file = "resources\\temp\\post_text.wav"
+    output_file = "resources\\temp\\audio\\post_text.wav"
     tts = gTTS(text, lang='en')
     tts.save(output_file)
     return output_file
@@ -256,22 +282,8 @@ def clean_json_file(input_file, output_file):
         return cleaned_dictionary
 
     data = load_json_file(input_file)
-    # Load the input JSON file
-    # with open(input_file, "r") as file:
-    #     data = json.load(file)
-    # print(data)
-
-    # Clean the text in each key-value pair of the JSON data
-    # cleaned_data = {}
-    # for key, value in data.items():
-    #     cleaned_value = clean_text(value)
-    #     cleaned_data[key] = cleaned_value
     cleaned_data = clean_dictionary_values(data)
-    
-    # Save the cleaned data to the output JSON file
-    save_json(cleaned_data, file_name="resources\\temp\\post.json")
-    # with open(output_file, "w") as file:
-    #     json.dump(cleaned_data, file, indent=4)
+    save_json(cleaned_data, output_file)
 
 def load_json_file(file_path):
     data = {}
@@ -533,54 +545,22 @@ def create_clip(post, index, file_name):
         return screenshots
 
     def create_post_text_for_video(post, audio_duration, start_duration):
-        # total_words = len(post.split())
-        # wps_from_audio = total_words / audio_duration
 
-        # Split the text into a list of paragraphs
-        # paragraph_list = post.split("\n\n")
+        ending_clip_time = 3
+        
         text_clips = []
 
-        # Add meta textclip
+        # Add Title textclip
         title = post['title']
-        # print(title)
         title_clip = TextClip(title, font="Impact", fontsize=fontsize+10, color='black', bg_color='white', align='West', method='caption', size=(mobile_text_size[0],None))
-        title_clip = title_clip.set_duration(audio_duration).set_position(("center",0.2), relative=True).set_opacity(opacity)
+        title_clip = title_clip.set_duration(audio_duration-ending_clip_time).set_position(("center",0.2), relative=True).set_opacity(opacity)
         text_clips.append(title_clip) # intro text
 
-        # time = start_duration + audio_duration
-        # for i, paragraph in enumerate(paragraph_list):
-        #     if paragraph: 
-        #         num_words = len(paragraph.split())
-        #         duration = (num_words / wps_from_audio)
-        #         text_clip = TextClip(paragraph, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
-        #         text_clip = text_clip.set_start(time).set_position('center').set_duration(duration).set_opacity(opacity)
-        #         text_clips.append(text_clip)
-        #         time += duration
-
-        # Add the comments in snippets here
-        # for comment in comments:
-        #     formatted_comment = comment["author"] + " wrote: " + comment["comment"] + "\n\n"
-        #     num_words = len(text.split())
-        #     duration = 5 # 5 seconds per comment
-        #     text_clip = TextClip(formatted_comment, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
-        #     text_clip = text_clip.set_start(time).set_pos('center').set_duration(duration).set_opacity(opacity)
-        #     text_clips.append(text_clip)
-        #     time += duration
-
-        # ending_comments =  \
-        #     "Comment what you think!" + "\n" + \
-        #     "YTA = You're the A-hole" + "\n" + \
-        #     "YWBTA = You Would Be the A-hole" + "\n" + \
-        #     "NTA = Not the A-hole" + "\n" + \
-        #     "YWNBTA = You Would Not be the A-hole" + "\n" + \
-        #     "ESH = Everyone Sucks Here" + "\n" + \
-        #     "NAH = No A-holes Here" + "\n" + \
-        #     "INFO = Not Enough Info"
-
-        # ending_comments_clip_time = 3
-        # ending_comments_clip = TextClip(ending_comments, font=font, fontsize=fontsize+4, color=color, bg_color=bg_color, align='West', method='caption', size=mobile_text_size)
-        # ending_comments_clip = ending_comments_clip.set_start(time-ending_comments_clip_time).set_pos('center').set_duration(ending_comments_clip_time)
-        # text_clips.append(ending_comments_clip)
+        # Add Ending textclip
+        ending_text = "Sub, Comment, Like for More! :)"
+        ending_comments_clip = TextClip(ending_text, font="Impact", fontsize=fontsize+10, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
+        ending_comments_clip = ending_comments_clip.set_start(audio_duration-ending_clip_time).set_duration(ending_clip_time).set_pos('center').set_opacity(opacity)
+        text_clips.append(ending_comments_clip)
         
         return text_clips
 
@@ -618,7 +598,7 @@ def create_clip(post, index, file_name):
     # post_meta = format_meta_text(post)
     # screenshot_files = get_screenshot_file(post)
     # background_video_file = get_video_file()
-    mp3_file = "resources\\temp\\post_text.wav"
+    mp3_file = "resources\\temp\\audio\\post_text.wav"
     mp4_file = file_name.replace("_", str(index+1))
     width = 720
     height = int(width*9/16) # 16/9 screen
@@ -654,18 +634,6 @@ def create_clip(post, index, file_name):
     # subtitles = subtitles.set_position(("center","center"), relative=True).set_start(start_duration).set_duration(audio.duration).set_opacity(opacity) # middle of screen
     print("Subtitles Set...")
     
-    # Set up the video clip from our screenshot or videos
-    # Intro Clip
-    # intro_video = ImageClip(screenshot_files[0], duration=start_duration)
-    # intro_video = intro_video.resize((mobile_text_size[0], 50)).set_position("center")
-    
-    # main_post_image = ImageClip(screenshot_files[0], duration=audio.duration)
-    # main_post_image = main_post_image.resize((mobile_text_size[0], 50)).set_position(("center", 0.1), relative=True).set_start(start_duration).set_duration(audio.duration)
-
-    # video = ImageSequenceClip(screenshot_file, fps=1)
-    # video = VideoFileClip(background_video_file).loop(duration=10)
-    # video = video.set_start(start_duration).set_duration(audio.duration)
-    # video = video.resize(mobile_video_size)
     background_clip = generate_concatenated_video(audio.duration, start_duration, mobile_video_size)
     background_clip = background_clip.set_audio(audio)
     print("Background Video Set...")
@@ -677,15 +645,14 @@ def create_clip(post, index, file_name):
     # Bind the audio/video to the textclips
     # final_clip = CompositeVideoClip([background_clip, subtitles], size=mobile_video_size)
     final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
-    # final_clip = CompositeVideoClip([background_clip, main_post_image, *text_clips, subtitles], size=mobile_video_size)
-    # final_clip = CompositeVideoClip([background_clip, *text_clips], size=mobile_video_size)
-    final_clip.write_videofile(mp4_file, threads=16)
+    final_clip.write_videofile(mp4_file, threads=16, codec='h264_nvenc')
     
+    # Clean up
+    for clip in text_clips:
+        clip.close()
     background_clip.close()
     subtitles.close()
     final_clip.close()
-
-    time.sleep(3)
     
     return mp4_file
 
@@ -725,15 +692,6 @@ def move_video(mp4_files):
     return moved_files
 
 def main():
-    # 1. Get all top posts from a subreddit
-    # 2. Get the comments from the top post
-    # 3. Combine the top post and the comments
-    # 4. Print the combined post
-    # 5. Convert the combined post to an mp3 file
-    # 6. Convert the mp3 file to an mp4 file
-    # 7. Add the post as a text overlay on top of the video
-    # 8. When the video ends, add the comments
-    # todo: 9. Autologin to YT, post the video
 
     # Variables to choose from...
     # url = "https://www.reddit.com/r/AmItheAsshole/top.json?t=day"
@@ -744,11 +702,16 @@ def main():
     number_of_posts = 15
     num_of_comments = 3
     file_name = f"Top Reddit Questions of Today _ #shorts #questions #curious #random #funny #fyp #reddit.mp4"
+    
+    
+    # Clean start and delete temp folder
+    delete_temp()
+    
     # Get Reddit posts from url
     reddit_posts = get_posts(url)
     
+    # get all posts and their comments
     json_posts = []
-    
     for i, post in enumerate(reddit_posts):
         if i > number_of_posts:
             break
@@ -757,26 +720,17 @@ def main():
         combined_post = combine_post_comments(post, post_comment, i)
         json_posts.append(combined_post)
     
-    # reddit_post = get_specific_post(reddit_posts, post_num)
-    # comments = get_comments(reddit_post['url'], num_of_comments)
-    # combined_post = combine_post_comments(reddit_post, comments)
-    
     # make videos for all clips.
     mp4_files = []
     for i, post in enumerate(json_posts):
         if i > number_of_posts:
             break
+        
+        # Create the clips
         mp4_file = create_clip(post, i, file_name)
         mp4_files.append(mp4_file)
-    # mp4_file = create_clip(combined_post)
-    # meta_data_file = "yt_meta_data.json"
-    # upload_to_youtube(mp4file, meta_data_file)
-    # move_video(mp4_files)
 
-    # Anything extra... 
-    # print_post(reddit_posts, post_num)
-    # print_comments(comments)
-    # print_json(combined_post)
+    # move_video(mp4_files)
 
 if __name__ == "__main__":
     main()
