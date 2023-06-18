@@ -24,6 +24,7 @@ from faster_whisper import WhisperModel
 from pathlib import Path
 from better_profanity import profanity
 from tqdm import tqdm
+from pydub.playback import play
 
 
 def delete_temp(folder_path="resources\\temp"):
@@ -236,9 +237,12 @@ def text_to_speech_gtts(sentences):
     delete_temp_audio()
     
     # Combine audio files
-    silence_time = 1 # seconds
+    silence_time = 1.5 # seconds
     sample_rate = 16000
+    change_speed = True
     audio_speed = 1.25
+    change_pitch = True
+    octaves = 0.25 # For decreasing, octave can be -0.5, -2 etc.
 
     # Initialize an empty AudioSegment object with the desired sample rate
     combined_audio = AudioSegment.silent(duration=silence_time*100, frame_rate=sample_rate)
@@ -252,8 +256,14 @@ def text_to_speech_gtts(sentences):
         combined_audio += audio_segment.set_frame_rate(sample_rate)  # Set the frame rate to the desired sample rate
 
     # Speed audio up
-    combined_audio = combined_audio.speedup(playback_speed=audio_speed)
-
+    if(change_speed):
+        combined_audio = combined_audio.speedup(playback_speed=audio_speed)
+    
+    # pitch
+    if(change_pitch):
+        new_sample_rate = int(combined_audio.frame_rate * (2.0 ** octaves))
+        combined_audio = combined_audio._spawn(combined_audio.raw_data, overrides={'frame_rate': new_sample_rate})
+    
     # Export combined audio to file
     output_file = "resources\\temp\\audio\\post_text.wav"
     combined_audio.export(output_file, format="wav")
@@ -448,13 +458,14 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     model = WhisperModel(model_size, device="cpu", compute_type="int8")
     # print(audio_file_path)
     segments, info = model.transcribe(audio_file_path, beam_size=5)
+    segments = list(segments)
     # segments, _ = model.transcribe(
     #     "audio.mp3",
     #     vad_filter=True,
     #     vad_parameters=dict(min_silence_duration_ms=500), # Vad takes out periods of silence
     # )
     # print("Detected language '%s' with probability %f" % (info.language, info.language_probability))
-    
+
     # Create the SRT file path dynamically
     audio_file_name = os.path.basename(audio_file_path)
     srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
@@ -463,7 +474,8 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     # open a new srt file and save the output from each segment
     with open(srt_file_path, "w") as srt_file:
         # Write each segment to the SRT file
-        for index, segment in tqdm(enumerate(segments, start=1), desc="Writing SRT", total=len(segments)):
+        for index, segment in enumerate(segments, start=1):
+        # for index, segment in tqdm(enumerate(segments, start=1), desc="Writing SRT", total=len(segments)):
             print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
             # print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, censor_keywords(segment.text)))
             srt_file.write(f"{index}\n")
@@ -713,7 +725,7 @@ def main():
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
     # post_num = 0  # first (top most post) (usually <25 posts)
-    number_of_posts = 1 #14
+    number_of_posts = 15
     num_of_comments = 3
 
     now = datetime.utcnow()
@@ -740,9 +752,6 @@ def main():
     # make videos for all clips.
     mp4_files = []
     for i, post in enumerate(json_posts):
-        if i > number_of_posts:
-            break
-        
         # Create the clips
         mp4_file = create_clip(post, i, file_name)
         mp4_files.append(mp4_file)
