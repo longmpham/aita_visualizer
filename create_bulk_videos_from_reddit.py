@@ -7,12 +7,12 @@ import pyttsx3
 import re
 import random
 import shutil
-from datetime import datetime, timedelta
+import datetime
+from datetime import timedelta
+from datetime import datetime as dt
 from moviepy.editor import *
 from gtts import gTTS
 import unicodedata
-# from youtube_uploader_selenium import YouTubeUploader
-# from selenium.webdriver.common.by import By
 import speech_recognition as sr
 from pydub import AudioSegment
 from pydub.utils import make_chunks
@@ -25,6 +25,7 @@ from pathlib import Path
 from better_profanity import profanity
 from tqdm import tqdm
 from pydub.playback import play
+from tiktok_tts_v2 import texttotiktoktts
 
 
 def delete_temp(folder_path="resources\\temp"):
@@ -43,8 +44,12 @@ def censor_keywords(text):
     return censored_text
 
 def utc_to_relative_time(utc_timestamp):
-    now = datetime.utcnow()
-    post_time = datetime.utcfromtimestamp(utc_timestamp)
+    
+    now = dt.utcnow()
+    post_time = dt.utcfromtimestamp(utc_timestamp)
+    # now = datetime.datetime.now()
+    # post_time = datetime.datetime.fromtimestamp(utc_timestamp)
+    
     time_diff = now - post_time
     if time_diff < timedelta(minutes=1):
         return 'just now'
@@ -73,7 +78,8 @@ def get_comments(url, max_num_of_comments=3):
     #         comment["data"]["ups"] = 1
 
     # Sort comments_data by largest "ups"
-    comments_data.sort(key=lambda comment: comment["data"].get("ups",1), reverse=True)
+    # comments_data.sort(key=lambda comment: comment["data"].get("ups",1), reverse=True)
+    
     # Print the sorted comments
     # for i, comment in enumerate(comments_data):
     #     ups = comment["data"].get("ups",1)
@@ -269,6 +275,54 @@ def text_to_speech_gtts(sentences):
     combined_audio.export(output_file, format="wav")
     return output_file
 
+def generate_TTS_using_TikTok(sentences):
+    def delete_temp_audio(folder_path="resources\\temp\\audio"):
+        # If temp folder is found, delete it
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+
+        # Create the folder
+        os.mkdir(folder_path)
+        
+        return
+    
+    delete_temp_audio()
+    
+    path = os.getcwd() + "\\resources\\temp\\audio"
+    tts_files = []
+    success = False
+    # Initialize an empty AudioSegment object with the desired sample rate
+    sample_rate = 16000
+    silence_time = 1
+    change_speed = True
+    audio_speed = 1.1
+    change_pitch = False
+    octaves = 0.25 # For decreasing, octave can be -0.5, -2 etc.
+    combined_audio = AudioSegment.silent(duration=silence_time*100, frame_rate=sample_rate)  
+    for i, sentence in enumerate(sentences):
+        
+        success, tts_file = texttotiktoktts(sentence, "en_us_001", path, file_name=f"audio_tts_{i}")
+        if not success: exit()
+        print(f"generated tts_file at: {tts_file}")
+        tts_files.append(tts_file)
+        # print(tts_file)
+        audio_segment = AudioSegment.from_file(tts_file)
+        combined_audio += audio_segment.set_frame_rate(sample_rate)  # Set the frame rate to the desired sample rate
+    
+    
+    # Speed audio up
+    if(change_speed):
+        combined_audio = combined_audio.speedup(playback_speed=audio_speed)
+    
+    # pitch
+    if(change_pitch):
+        new_sample_rate = int(combined_audio.frame_rate * (2.0 ** octaves))
+        combined_audio = combined_audio._spawn(combined_audio.raw_data, overrides={'frame_rate': new_sample_rate})
+    # Export combined audio to file
+    output_file = "resources\\temp\\audio\\post_text.wav"
+    combined_audio.export(output_file, format="wav")
+    return output_file
+
 def clean_json_file(input_file, output_file):
     def clean_text(text):
         # Convert to string if input is not already a string
@@ -443,8 +497,7 @@ def generate_srt_from_audio(audio_file_path):
 
     return srt_file_path
 
-def generate_srt_from_audio_using_whisper(audio_file_path):
-    
+def generate_srt_from_audio_using_whisper(audio_file_path):  
     def format_timedelta(seconds):
         delta = timedelta(seconds=seconds)
         hours = delta.seconds // 3600
@@ -453,6 +506,7 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
         milliseconds = delta.microseconds // 1000
         return f"{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f},{milliseconds:03.0f}"
     
+    print("generating srt file using whisper...")
     # use large-v2 model and transcribe the audio file
     model_size = "large-v2"
     model = WhisperModel(model_size, device="cpu", compute_type="int8")
@@ -471,19 +525,21 @@ def generate_srt_from_audio_using_whisper(audio_file_path):
     srt_file_name = os.path.splitext(audio_file_name)[0] + ".srt"
     srt_file_path = os.getcwd() + f"\\resources\\temp\\{srt_file_name}"
     
+    start_end_times = []
     # open a new srt file and save the output from each segment
     with open(srt_file_path, "w") as srt_file:
         # Write each segment to the SRT file
         for index, segment in enumerate(segments, start=1):
         # for index, segment in tqdm(enumerate(segments, start=1), desc="Writing SRT", total=len(segments)):
             print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text))
+            start_end_times.append((segment.start, segment.end))
             # print("[%.2fs -> %.2fs] %s" % (segment.start, segment.end, censor_keywords(segment.text)))
             srt_file.write(f"{index}\n")
             # srt_file.write(f"{segment.start:.2f} --> {segment.end:.2f}\n")
             srt_file.write(f"{format_timedelta(segment.start)} --> {format_timedelta(segment.end)}\n")
             srt_file.write(f"{segment.text}\n\n")
     
-    return srt_file_path
+    return srt_file_path, start_end_times
 
 def generate_concatenated_video(audio_duration, start_duration, mobile_video_size):
     def get_video_file():
@@ -640,7 +696,8 @@ def create_clip(post, index, file_name):
     start_duration = 0
     
     # Set up the audio clip from our post to TTS
-    audio = AudioFileClip(text_to_speech_gtts(post_full))
+    # audio = AudioFileClip(text_to_speech_gtts(post_full))
+    audio = AudioFileClip(generate_TTS_using_TikTok(post_full))
     # audio = AudioFileClip(text_to_speech_pyttsx3(post_full, audio_file))
     # print(post_full)
     # audio = AudioFileClip(generate_TTS_using_coqui(post_full))
@@ -648,7 +705,7 @@ def create_clip(post, index, file_name):
     audio = audio.set_start(start_duration)
 
     # srt_file = generate_srt_from_audio(audio_file)
-    srt_file = generate_srt_from_audio_using_whisper(audio_file)
+    srt_file, start_end_times = generate_srt_from_audio_using_whisper(audio_file)
     generator = lambda txt: TextClip(txt, font=font, fontsize=fontsize, color=color, bg_color=bg_color, align='West', method='caption', size=(mobile_text_size[0],None))
     # subs = [((0, 2), 'subs1'),
     #         ((2, 4), 'subs2'),
@@ -663,6 +720,24 @@ def create_clip(post, index, file_name):
     background_clip = generate_concatenated_video(audio.duration, start_duration, mobile_video_size)
     background_clip = background_clip.set_audio(audio)
     print("Background Video Set...")
+    
+    # image_clips = []
+    # print(screenshot_files)
+    # for file in screenshot_files:
+    #     print(file)
+    # for a,b in start_end_times:
+    #     print(a,b)
+    # print(start_end_times)
+    # exit()
+    # for i, (start, end) in enumerate(start_end_times):
+    #     print(f"Index: {i}, Start time: {start}, End time: {end}")
+    #     image_clip = ImageClip(screenshot_files[i])
+    #     image_clip = image_clip.set_position(("center","center"), relative=True).set_start(start).set_duration(end).set_opacity(1).resize(width=mobile_text_size[0])#resize((720*0.9,(1280*0.9)*9/16))
+    #     image_clips.append(image_clip)
+    # image_clip = ImageClip(screenshot_files[1])
+    # image_clip_comment_1 = ImageClip(screenshot_files[2])
+    # image_clip_comment_2 = ImageClip(screenshot_files[3])
+    # image_clip_comment_3 = ImageClip(screenshot_files[4])
 
     # Set up the text clip overlays for the video
     text_clips = create_post_text_for_video(post, audio.duration, start_duration)
@@ -670,7 +745,10 @@ def create_clip(post, index, file_name):
 
     # Bind the audio/video to the textclips
     # final_clip = CompositeVideoClip([background_clip, subtitles], size=mobile_video_size)
+    # final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles, *image_clips], size=mobile_video_size)
     final_clip = CompositeVideoClip([background_clip, *text_clips, subtitles], size=mobile_video_size)
+    # final_clip.save_frame("frame.png", t=1)
+    # exit()
     final_clip.write_videofile(mp4_file, threads=16, codec='h264_nvenc')
     
     # Clean up
@@ -725,13 +803,14 @@ def main():
     # url = "https://www.reddit.com/r/mildlyinfuriating/top.json?t=day"
     # url = "https://www.reddit.com/subreddits/popular.json"
     # post_num = 0  # first (top most post) (usually <25 posts)
-    number_of_posts = 15
+    number_of_posts = 1
     num_of_comments = 3
 
-    now = datetime.utcnow()
+    now = datetime.date.today()
     formatted_date = now.strftime("%b.%d.%Y")
     file_name = f"Top Reddit Questions of {formatted_date} _ #shorts #questions #curious #random #funny #fyp #reddit.mp4"
     
+    start_time = time.time()
     
     # Clean start and delete temp folder
     delete_temp()
@@ -756,6 +835,8 @@ def main():
         mp4_file = create_clip(post, i, file_name)
         mp4_files.append(mp4_file)
 
+    end_time = time.time()
+    print("Time taken:", end_time - start_time)
     # move_video(mp4_files)
 
 if __name__ == "__main__":

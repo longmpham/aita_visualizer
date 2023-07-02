@@ -4,7 +4,6 @@ from pydub import AudioSegment
 from moviepy.editor import *
 from TTS.api import TTS
 from pydub import AudioSegment
-from shutil import which
 
 coqui_speaker_list = [
     "tts_models/en/jenny/jenny", # OK 

@@ -101,7 +101,8 @@ def get_comment_screenshot(url, max_num_of_comments=3):
     for i in range(max_num_of_comments):
         # Get a comment number and the comment post
         # comment_id += 1  # for the top n comments
-        comment_id = get_new_comment_id()
+        # comment_id = get_new_comment_id()
+        comment_id = i + 2
         post_element = WebDriverWait(browser, 10).until(EC.visibility_of_element_located(
             (By.XPATH, f'//*[@id="comment-tree"]/shreddit-comment[{comment_id}]')))
 
@@ -163,7 +164,8 @@ def get_full_screenshot(url, max_num_of_comments=3):
     # Get the comment element(s)
     for i in range(max_num_of_comments):
         try:
-            comment_id = get_new_comment_id() # gets random comment id from 2-24
+            # comment_id = get_new_comment_id() # gets random comment id from 2-24
+            comment_id = i + 1
             comment_element = WebDriverWait(browser, 10).until(EC.visibility_of_element_located(
                 (By.XPATH, f'//*[@id="comment-tree"]/shreddit-comment[{comment_id}]')))
 
@@ -199,6 +201,7 @@ def get_full_screenshot(url, max_num_of_comments=3):
     for i, comment in enumerate(screenshots['comments']):
         comment_path = os.path.join(screenshot_folder, f'screenshot_comment_{i}.png')
         comment_paths.append(comment_path)
+        screenshot_paths.append(comment_path)
         with open(comment_path, 'wb') as f:
             f.write(comment)   
     screenshot_paths.append(comment_paths)
